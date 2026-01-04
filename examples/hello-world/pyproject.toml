@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hello-world-demo"
+version = "0.1.0"
+description = "Hello World demo app for cli-repl-kit"
+dependencies = [
+    "cli-repl-kit",
+]
+
+[project.scripts]
+hello-world = "hello_world.cli:main"
+
+[project.entry-points."repl.commands"]
+hello = "hello_world.commands:HelloCommandsPlugin"
+
+[tool.setuptools.packages.find]
+where = ["."]
