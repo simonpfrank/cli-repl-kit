@@ -495,6 +495,187 @@ class DatabaseCommandsPlugin(CommandPlugin):
         cli.add_command(users, name="users")
 ```
 
+## Try the Live Demo: Hello World Example
+
+The repository includes a fully working Hello World demo app that showcases all framework features.
+
+### What the Demo Includes
+
+The demo (`examples/hello-world/`) has:
+- **4 commands**: `/quit`, `/hello`, `/sub red`, `/sub blue`
+- **Agent mode**: Free text input that echoes back
+- **Colored output**: Red and blue text demonstration
+- **Tab completion**: All commands with `/` prefix
+- **Dual-mode**: Works as both REPL and CLI
+
+### Running the Demo
+
+**From the repository root:**
+
+```bash
+# Interactive REPL mode
+./examples/hello-world/run.sh
+
+# CLI mode (direct commands)
+./examples/hello-world/run.sh hello "testing"
+./examples/hello-world/run.sh sub red "red text"
+./examples/hello-world/run.sh sub blue "blue text"
+```
+
+**Or with Python directly:**
+
+```bash
+# Make sure you're in the cli-repl-kit root directory
+cd /path/to/cli-repl-kit
+
+# REPL mode
+PYTHONPATH=src:examples/hello-world python -m hello_world.cli
+
+# CLI mode
+PYTHONPATH=src:examples/hello-world python -m hello_world.cli hello "test"
+```
+
+### Example Session
+
+```
+$ ./examples/hello-world/run.sh
+
+Hello World Demo
+Type /help for commands, /quit to exit
+
+> /hello world
+hello - world
+
+> /sub red this text appears in red
+this text appears in red
+
+> /sub blue this text appears in blue
+this text appears in blue
+
+> just typing some text without a slash
+Echo: just typing some text without a slash
+
+> /quit
+Goodbye!
+```
+
+### How the Demo Was Made
+
+The demo consists of only **3 small files** (plus config):
+
+**1. `pyproject.toml`** - Package configuration
+```toml
+[project]
+name = "hello-world-demo"
+dependencies = ["cli-repl-kit"]
+
+[project.scripts]
+hello-world = "hello_world.cli:main"
+
+[project.entry-points."repl.commands"]
+hello = "hello_world.commands:HelloCommandsPlugin"
+```
+
+**2. `hello_world/cli.py`** - Entry point (11 lines)
+```python
+from cli_repl_kit import REPL
+
+def main():
+    repl = REPL(app_name="Hello World Demo")
+    repl.start(enable_agent_mode=True)  # Enable free text input
+
+if __name__ == "__main__":
+    main()
+```
+
+**3. `hello_world/commands.py`** - Command implementations (54 lines)
+```python
+import click
+from cli_repl_kit import CommandPlugin
+from rich.console import Console
+
+class HelloCommandsPlugin(CommandPlugin):
+    @property
+    def name(self):
+        return "hello_commands"
+
+    def register(self, cli, context_factory):
+        console = Console()
+
+        @click.command()
+        def quit():
+            """Exit the application."""
+            console.print("[dim]Goodbye![/dim]")
+            raise SystemExit(0)
+
+        @click.command()
+        @click.argument("text", nargs=-1, required=True)
+        def hello(text):
+            """Say hello with custom text."""
+            message = " ".join(text)
+            console.print(f"hello - {message}")
+
+        @click.group()
+        def sub():
+            """Colored text subcommands."""
+            pass
+
+        @sub.command()
+        @click.argument("text", nargs=-1, required=True)
+        def red(text):
+            """Print text in red."""
+            message = " ".join(text)
+            console.print(f"[red]{message}[/red]")
+
+        @sub.command()
+        @click.argument("text", nargs=-1, required=True)
+        def blue(text):
+            """Print text in blue."""
+            message = " ".join(text)
+            console.print(f"[blue]{message}[/blue]")
+
+        cli.add_command(quit, name="quit")
+        cli.add_command(hello, name="hello")
+        cli.add_command(sub, name="sub")
+```
+
+### Key Takeaways from the Demo
+
+1. **Minimal code**: Just 3 small files to create a full-featured CLI/REPL
+2. **Automatic discovery**: Entry points in `pyproject.toml` mean no manual registration
+3. **Works both ways**: Same code works as interactive REPL and direct CLI
+4. **Tab completion**: Free with the framework - no configuration needed
+5. **Colored output**: Rich integration makes styling trivial
+6. **Subcommands**: Click groups work seamlessly (`/sub red`, `/sub blue`)
+7. **Agent mode**: Toggle free text input with one parameter
+
+### Demo File Structure
+
+```
+examples/hello-world/
+├── pyproject.toml          # Package config (entry points, dependencies)
+├── README.md               # Demo-specific documentation
+├── run.sh                  # Convenience wrapper script
+└── hello_world/
+    ├── __init__.py         # Empty package init
+    ├── cli.py              # Entry point (11 lines)
+    └── commands.py         # All commands (54 lines)
+```
+
+**Total: ~65 lines of actual code for a complete CLI/REPL app!**
+
+### Building Your Own App
+
+To create your own app like this:
+
+1. **Copy the structure**: Use `examples/hello-world` as a template
+2. **Modify `pyproject.toml`**: Change name, add dependencies
+3. **Update `cli.py`**: Change app name, toggle agent mode
+4. **Write your commands** in `commands.py`: Define your CommandPlugin
+5. **Install and run**: `pip install -e .` then run your app!
+
+See the [demo's README](examples/hello-world/README.md) for more details.
+
 ## API Reference
 
 ### REPL Class
