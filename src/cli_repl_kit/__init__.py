@@ -14,5 +14,8 @@ with both REPL (Read-Eval-Print Loop) and traditional CLI modes. It features:
 
 __version__ = "0.1.0"
 
-# Main exports will be added as we implement the components
-__all__ = []
+# Main exports
+from cli_repl_kit.core.repl import REPL
+from cli_repl_kit.plugins.base import CommandPlugin
+
+__all__ = ["REPL", "CommandPlugin"]
