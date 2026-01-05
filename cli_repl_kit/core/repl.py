@@ -244,6 +244,22 @@ class REPL:
             message = " ".join(text)
             sys.stderr.write(message + "\n")
 
+        @self.cli.command(name="status")
+        @click.argument("text", nargs=-1, required=False)
+        def status_command(text):
+            """Set or clear status line text."""
+            # Note: This command needs access to set_status() from REPL
+            # Will be called during REPL execution where set_status is available
+            pass  # Implementation will be in REPL context
+
+        @self.cli.command(name="info")
+        @click.argument("text", nargs=-1, required=False)
+        def info_command(text):
+            """Set or clear info line text."""
+            # Note: This command needs access to set_info() from REPL
+            # Will be called during REPL execution where set_info is available
+            pass  # Implementation will be in REPL context
+
     def _load_plugins(self):
         """Discover and register plugins from entry points."""
         discovered = entry_points(group=self.plugin_group)
@@ -296,10 +312,13 @@ class REPL:
         # Create completer
         completer = SlashCommandCompleter(commands_dict, cli_group=self.cli)
 
-        # Setup history file
-        history_dir = Path.home() / f".{self.app_name.lower().replace(' ', '-')}"
-        history_dir.mkdir(exist_ok=True)
-        history_file = history_dir / "history"
+        # Setup history file from config
+        history_location = self.config.history.file_location
+        history_file = Path(history_location).expanduser()
+
+        # Create parent directory if it doesn't exist
+        if history_file.parent != Path("."):
+            history_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Box width (inner content area)
         box_width = 140
@@ -600,9 +619,15 @@ class REPL:
         def get_input_height():
             """Calculate input height based on number of lines in buffer."""
             # Count newlines in buffer to determine line count
-            line_count = max(1, input_buffer.text.count('\n') + 1) if input_buffer.text else 1
-            # No max limit - input can grow endlessly within terminal limits
-            return D(preferred=line_count)
+            text = input_buffer.text
+            if not text:
+                # Empty buffer - use initial height from config
+                return D(preferred=self.config.windows.input.initial_height, min=1)
+            else:
+                # Calculate based on actual content
+                line_count = max(1, text.count('\n') + 1)
+                # No max limit - input can grow endlessly within terminal limits
+                return D(preferred=line_count, min=1)
 
         input_window = Window(
             content=BufferControl(
@@ -640,7 +665,7 @@ class REPL:
             """Calculate menu height dynamically.
 
             When slash command is active with completions, show full menu height.
-            Otherwise, show minimal height (1 line) to reserve space.
+            Otherwise, show 0 height to save space.
             The layout manager handles push down/up automatically based on
             available space and weight=1 for output window.
             """
@@ -649,8 +674,8 @@ class REPL:
                 # min=1 ensures at least 1 line visible even when space is tight
                 return D(preferred=menu_preferred_height, min=1)
             else:
-                # Minimal height when not active - just reserve space
-                return D(preferred=1, min=0)
+                # Zero height when not active - completely hidden
+                return D(preferred=0, min=0)
 
         menu_window = Window(
             content=FormattedTextControl(text=render_completions),
@@ -866,7 +891,8 @@ class REPL:
         def do_enter(event):
             """Execute command."""
             buffer = event.current_buffer
-            text = buffer.text.strip()
+            original_text = buffer.text  # Preserve original with blank lines
+            text = original_text.strip()  # Use stripped for execution
 
             # Remove placeholder if still present
             if "<text>" in text:
@@ -887,8 +913,8 @@ class REPL:
             if not text:
                 return
 
-            # Add command to output (with auto-scroll)
-            add_output_line([("bold", "> "), ("", text)])
+            # Add command to output (with auto-scroll) - show original with blank lines
+            add_output_line([("bold", "> "), ("", original_text)])
             # Reset scroll lock on new command submission
             state["user_scrolled_output"] = False
             state["output_scroll_offset"] = 0
@@ -920,6 +946,26 @@ class REPL:
                 add_output_line([("", "Goodbye!")])
                 event.app.invalidate()
                 event.app.exit()
+                return
+
+            # Handle built-in status command
+            if cmd_name == "status":
+                if cmd_args:
+                    message = " ".join(cmd_args)
+                    self.set_status(message)
+                else:
+                    self.clear_status()
+                event.app.invalidate()
+                return
+
+            # Handle built-in info command
+            if cmd_name == "info":
+                if cmd_args:
+                    message = " ".join(cmd_args)
+                    self.set_info(message)
+                else:
+                    self.clear_info()
+                event.app.invalidate()
                 return
 
             # Execute command
