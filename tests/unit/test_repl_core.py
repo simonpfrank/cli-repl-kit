@@ -174,7 +174,10 @@ def test_repl_handles_no_plugins_gracefully(mock_entry_points):
     # Should not raise
     repl = REPL(app_name="Test App")
     assert isinstance(repl.cli, click.Group)
-    assert len(repl.cli.commands) == 0
+    # Should have 2 built-in commands (print, error) even with no plugins
+    assert len(repl.cli.commands) == 2
+    assert "print" in repl.cli.commands
+    assert "error" in repl.cli.commands
 
 
 def test_repl_has_start_method():

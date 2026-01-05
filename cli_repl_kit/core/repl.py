@@ -15,7 +15,123 @@ from prompt_toolkit.layout.screen import WritePosition
 from prompt_toolkit.application import Application
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.document import Document
+from prompt_toolkit.formatted_text import ANSI
+from prompt_toolkit.lexers import Lexer
 from contextlib import redirect_stdout, redirect_stderr
+
+
+def formatted_to_ansi(formatted_text, config):
+    """Convert FormattedText list to ANSI-escaped string.
+
+    Args:
+        formatted_text: List of (style, text) tuples
+        config: Config object with ansi_colors
+
+    Returns:
+        String with ANSI escape codes
+    """
+    if not formatted_text:
+        return ""
+
+    ansi_colors = config.ansi_colors
+    reset = ansi_colors.reset
+
+    result = []
+    for style, text in formatted_text:
+        # Handle empty style
+        if not style or style == "":
+            result.append(text)
+            continue
+
+        # Try to look up style in config
+        # Replace spaces with underscores for combined styles like "cyan bold" -> "cyan_bold"
+        style_key = style.replace(" ", "_")
+
+        # Try to get ANSI code from config
+        ansi_code = None
+        if hasattr(ansi_colors, style_key):
+            ansi_code = getattr(ansi_colors, style_key)
+        elif hasattr(ansi_colors, style):
+            ansi_code = getattr(ansi_colors, style)
+
+        if ansi_code:
+            result.append(f"{ansi_code}{text}{reset}")
+        else:
+            # Unknown style, just append text without ANSI codes
+            result.append(text)
+
+    return "".join(result)
+
+
+class ANSILexer(Lexer):
+    """Lexer that interprets ANSI escape codes and returns styled fragments."""
+
+    def lex_document(self, document):
+        """Return a function that returns styled fragments for a line.
+
+        Args:
+            document: prompt_toolkit Document
+
+        Returns:
+            Function that takes line number and returns FormattedText
+        """
+        lines = document.lines
+
+        def get_line(lineno):
+            """Get styled fragments for a specific line number.
+
+            Args:
+                lineno: Line number (0-indexed)
+
+            Returns:
+                List of (style, text) tuples (FormattedText)
+            """
+            if lineno < len(lines):
+                line = lines[lineno]
+                # Parse ANSI codes and return FormattedText
+                return list(ANSI(line).__pt_formatted_text__())
+            return []
+
+        return get_line
+
+
+class OutputCapture(io.StringIO):
+    """Capture stdout/stderr and redirect to output buffer."""
+
+    def __init__(self, stream_type, output_callback, config):
+        """Initialize capture.
+
+        Args:
+            stream_type: "stdout" or "stderr"
+            output_callback: Function to call with captured text (FormattedText)
+            config: Config for styling
+        """
+        super().__init__()
+        self.stream_type = stream_type
+        self.output_callback = output_callback
+        self.config = config
+
+    def write(self, text):
+        """Capture text and send to output.
+
+        Args:
+            text: Text to capture
+        """
+        if not text or text == "\n":
+            return
+
+        # Add to output with appropriate styling
+        if self.stream_type == "stderr":
+            # Red for errors
+            self.output_callback([("red", text)])
+        else:
+            # Default (no style) for stdout
+            self.output_callback([("", text)])
+
+    def flush(self):
+        """Flush (no-op for our purposes)."""
+        pass
 
 
 class ConditionalScrollbarMargin(Margin):
@@ -77,6 +193,7 @@ class REPL:
         context_factory: Optional[Callable[[], Dict[str, Any]]] = None,
         cli_group: Optional[click.Group] = None,
         plugin_group: str = "repl.commands",
+        config_path: Optional[str] = None,
     ):
         """Initialize the REPL.
 
@@ -87,14 +204,45 @@ class REPL:
             cli_group: Existing Click group to use. If None, creates a new one.
             plugin_group: Entry point group name for discovering plugins.
                         Defaults to "repl.commands".
+            config_path: Optional path to custom config file. If None, uses default.
         """
         self.app_name = app_name
         self.context_factory = context_factory or (lambda: {})
         self.cli = cli_group or click.Group()
         self.plugin_group = plugin_group
 
+        # Add built-in test commands
+        self._register_builtin_commands()
+
+        # Load config
+        from cli_repl_kit.core.config import Config
+        import cli_repl_kit
+        if config_path:
+            self.config = Config.load(config_path, app_name=app_name)
+        else:
+            # Use default config from package
+            default_config = Path(cli_repl_kit.__file__).parent / "config.yaml"
+            self.config = Config.load(str(default_config), app_name=app_name)
+
         # Discover and load plugins
         self._load_plugins()
+
+    def _register_builtin_commands(self):
+        """Register built-in test commands."""
+
+        @self.cli.command(name="print")
+        @click.argument("text", nargs=-1, required=True)
+        def print_command(text):
+            """Test stdout capture by printing text."""
+            message = " ".join(text)
+            print(message)
+
+        @self.cli.command(name="error")
+        @click.argument("text", nargs=-1, required=True)
+        def error_command(text):
+            """Test stderr capture by writing to stderr."""
+            message = " ".join(text)
+            sys.stderr.write(message + "\n")
 
     def _load_plugins(self):
         """Discover and register plugins from entry points."""
@@ -197,11 +345,17 @@ class REPL:
 
         # State - use a mutable container so closures can modify it
         state = {
-            "output_lines": intro_text.copy(),
+            # PRESERVED Phase C.1: "output_lines": intro_text.copy(),
+            # PRESERVED Phase C.1: "output_scroll_offset": 0,  # Track scroll position (0 = at bottom)
+            # PRESERVED Phase C.1: "user_scrolled_output": False,  # True when user has scrolled up
             "completions": [],
             "selected_idx": 0,
             "placeholder_active": False,  # Track if <text> placeholder is shown
             "placeholder_start": 0,  # Cursor position where placeholder starts
+            "status_text": [],  # Status line content (FormattedText)
+            "info_text": [],  # Info line content (FormattedText)
+            "slash_command_active": False,  # True when input starts with /
+            "is_multiline": False,  # True when input has \n
         }
 
         # Helper to get argument info for a command
@@ -229,26 +383,111 @@ class REPL:
             return None
 
         # Grey divider
+        divider_color = self.config.colors.divider
         def grey_line():
             return Window(
                 height=1,
                 content=FormattedTextControl(
-                    text=lambda: [("#808080", "─" * 200)]
+                    text=lambda: [(divider_color, "─" * 200)]
                 ),
             )
 
-        # Render output area - show recent lines
-        def render_output():
-            # Show all lines - let the window with height=D(weight=1) handle display
-            # As input grows, output window shrinks automatically, creating scroll effect
-            result = []
-            for line in state["output_lines"]:
-                if isinstance(line, list):
-                    result.extend(line)
-                else:
-                    result.append(("", str(line)))
-                result.append(("", "\n"))
-            return result
+        # PRESERVED: Original FormattedText-based output rendering (Phase C.1)
+        # # Helper to add output with auto-scroll support
+        # def add_output_line(line):
+        #     """Add a line to output with auto-scroll behavior.
+        #
+        #     If user hasn't scrolled up, reset scroll to bottom.
+        #     If user has scrolled up (scroll lock), preserve their position.
+        #     """
+        #     state["output_lines"].append(line)
+        #     # Auto-scroll to bottom unless user has scrolled up
+        #     if not state["user_scrolled_output"]:
+        #         state["output_scroll_offset"] = 0
+        #
+        # # Render output area - show recent lines
+        # def render_output():
+        #     """Render output with scroll offset support.
+        #
+        #     Scroll offset is from the bottom - 0 means show latest content at bottom.
+        #     Positive offset means show earlier content (scrolled up).
+        #     """
+        #     lines = state["output_lines"]
+        #     scroll_offset = state["output_scroll_offset"]
+        #
+        #     # If scrolled up, show content from (total - offset) position
+        #     # Otherwise show all content (prompt_toolkit handles display from bottom)
+        #     if scroll_offset > 0 and len(lines) > scroll_offset:
+        #         # Show content up to (total - offset) lines from bottom
+        #         end_idx = len(lines) - scroll_offset
+        #         lines = lines[:end_idx]
+        #
+        #     result = []
+        #     for line in lines:
+        #         if isinstance(line, list):
+        #             result.extend(line)
+        #         else:
+        #             result.append(("", str(line)))
+        #         result.append(("", "\n"))
+        #     return result
+
+        # NEW Phase D: Buffer-based output with ANSI support
+        # Create output buffer (not read_only since window is focusable=False)
+        output_buffer = Buffer(name="output")
+
+        # Convert intro banner to ANSI for buffer
+        intro_text_ansi = ""
+        for line in intro_text:
+            if isinstance(line, list):
+                intro_text_ansi += formatted_to_ansi(line, self.config) + "\n"
+            else:
+                intro_text_ansi += str(line) + "\n"
+
+        # Initialize buffer with intro banner
+        output_buffer.document = Document(
+            text=intro_text_ansi,
+            cursor_position=len(intro_text_ansi)
+        )
+
+        # Helper to add output to buffer with auto-scroll
+        def add_output_line(line):
+            """Add a line to output buffer with auto-scroll behavior.
+
+            Args:
+                line: Either a string or FormattedText list [(style, text), ...]
+            """
+            if isinstance(line, list):
+                # FormattedText - convert to ANSI string
+                text = formatted_to_ansi(line, self.config)
+            else:
+                text = str(line)
+
+            # Append to buffer using Document
+            current = output_buffer.text
+            if current:
+                new_text = current + text + "\n"
+            else:
+                new_text = text + "\n"
+
+            # Update buffer document with auto-scroll to bottom
+            output_buffer.document = Document(
+                text=new_text,
+                cursor_position=len(new_text)
+            )
+
+        # Render status line
+        def render_status():
+            """Render status line content."""
+            if not state["status_text"]:
+                return []
+            return state["status_text"]
+
+        # Render info line
+        def render_info():
+            """Render info line content."""
+            if not state["info_text"]:
+                return []
+            return state["info_text"]
 
         # Render completion menu
         def render_completions():
@@ -270,7 +509,9 @@ class REPL:
                 prefix = "/" if is_top_level else ""
                 formatted = f"{prefix}{cmd_text:<19} {help_text}"
 
-                style = "#6B4FBB bold" if i == state["selected_idx"] else "#808080"
+                highlight_color = self.config.colors.highlight
+                grey_color = self.config.colors.grey
+                style = f"{highlight_color} bold" if i == state["selected_idx"] else grey_color
                 lines.append((style, formatted))
                 if i < len(state["completions"]) - 1:
                     lines.append(("", "\n"))
@@ -279,6 +520,10 @@ class REPL:
         # Update completions on text change
         def on_text_changed(_):
             text = input_buffer.text
+
+            # Update state tracking
+            state["slash_command_active"] = text.startswith("/")
+            state["is_multiline"] = "\n" in text
 
             # Handle placeholder removal when user starts typing
             if state["placeholder_active"] and "<text>" in text:
@@ -318,27 +563,46 @@ class REPL:
             on_text_changed=on_text_changed,
         )
 
-        # Windows
+        # PRESERVED: Original FormattedTextControl output_window (Phase C.1)
+        # # Windows
+        # output_window = Window(
+        #     content=FormattedTextControl(text=render_output),
+        #     height=D(weight=1),  # Take remaining space
+        #     wrap_lines=True,
+        #     always_hide_cursor=True,  # Display only - no cursor
+        # )
+
+        # NEW Phase D: Output window with BufferControl + ANSILexer
         output_window = Window(
-            content=FormattedTextControl(text=render_output),
+            content=BufferControl(
+                buffer=output_buffer,
+                focusable=False,
+                include_default_input_processors=False,
+                lexer=ANSILexer(),  # Render ANSI codes as styled text
+            ),
             height=D(weight=1),  # Take remaining space
             wrap_lines=True,
+            always_hide_cursor=True,  # Display only - no cursor
         )
 
-        # Function to show prompt (> for first line, indent for continuation)
-        def get_input_prompt(line_number, wrap_count):
-            """Show > prompt on first line, indent on continuation lines."""
-            if line_number == 0 and wrap_count == 0:
-                return [("bold", "> ")]
-            else:
-                return [("", "  ")]  # Indent continuation lines
+        # Function to show prompt (configurable, with dynamic continuation spacing)
+        prompt_char = self.config.prompt.character  # e.g., "> " or "Agent >"
 
-        # Dynamic height based on buffer content
+        def get_input_prompt(line_number, wrap_count):
+            """Show configurable prompt on first line, matching indent on continuation lines."""
+            if line_number == 0 and wrap_count == 0:
+                return [("bold", prompt_char)]
+            else:
+                # Continuation spacing matches prompt length for alignment
+                return [("", " " * len(prompt_char))]
+
+        # Dynamic height based on buffer content (no max - grows endlessly)
         def get_input_height():
             """Calculate input height based on number of lines in buffer."""
             # Count newlines in buffer to determine line count
             line_count = max(1, input_buffer.text.count('\n') + 1) if input_buffer.text else 1
-            return D(preferred=line_count, max=10)
+            # No max limit - input can grow endlessly within terminal limits
+            return D(preferred=line_count)
 
         input_window = Window(
             content=BufferControl(
@@ -347,26 +611,62 @@ class REPL:
                 input_processors=[],
                 include_default_input_processors=False,
             ),
-            height=get_input_height,  # Dynamic height: 1 line when empty, grows with content
+            height=get_input_height,  # Dynamic height: 1 line when empty, grows endlessly
             wrap_lines=True,
             get_line_prefix=get_input_prompt,  # Add > prompt
-            right_margins=[ConditionalScrollbarMargin(input_buffer, max_lines=10, display_arrows=True)],
-            scroll_offsets=ScrollOffsets(top=1, bottom=1),  # Keep cursor visible with some padding
+            # NO scrollbar - input grows endlessly, no internal scrolling
+            # NO scroll_offsets - was causing 4-line initial height bug
         )
+
+        # Status and info windows
+        status_window = Window(
+            content=FormattedTextControl(text=render_status),
+            height=self.config.windows.status.height,
+            wrap_lines=False,  # Truncate overflow
+        )
+
+        info_window = Window(
+            content=FormattedTextControl(text=render_info),
+            height=self.config.windows.info.height,
+            wrap_lines=False,  # Truncate overflow
+        )
+
+        # Dynamic menu height - shows preferred height when slash command active,
+        # otherwise minimal height to save space
+        menu_preferred_height = self.config.windows.menu.height
+        info_height = self.config.windows.info.height
+
+        def get_menu_height():
+            """Calculate menu height dynamically.
+
+            When slash command is active with completions, show full menu height.
+            Otherwise, show minimal height (1 line) to reserve space.
+            The layout manager handles push down/up automatically based on
+            available space and weight=1 for output window.
+            """
+            if state["slash_command_active"] and state["completions"]:
+                # Show full menu when slash command active
+                # min=1 ensures at least 1 line visible even when space is tight
+                return D(preferred=menu_preferred_height, min=1)
+            else:
+                # Minimal height when not active - just reserve space
+                return D(preferred=1, min=0)
 
         menu_window = Window(
             content=FormattedTextControl(text=render_completions),
-            height=D(preferred=5),
+            height=get_menu_height,  # Dynamic height based on slash command state
             wrap_lines=True,
         )
 
-        # Layout
+        # Layout with 5 windows
         layout = Layout(
             HSplit([
                 output_window,
+                status_window,
                 grey_line(),
                 input_window,
                 grey_line(),
+                info_window,
                 menu_window,
             ])
         )
@@ -390,17 +690,82 @@ class REPL:
         def insert_newline(event):
             event.current_buffer.insert_text("\n")
 
-        @kb.add("down")
-        def nav_down(event):
-            if state["completions"] and state["selected_idx"] < len(state["completions"]) - 1:
-                state["selected_idx"] += 1
-                event.app.invalidate()
-
         @kb.add("up")
-        def nav_up(event):
-            if state["completions"] and state["selected_idx"] > 0:
-                state["selected_idx"] -= 1
+        def handle_up(event):
+            """Context-dependent up arrow handling."""
+            buffer = event.current_buffer
+
+            # Context 1: Slash command active with > 1 option - navigate menu
+            if state["slash_command_active"] and len(state["completions"]) > 1:
+                if state["selected_idx"] > 0:
+                    state["selected_idx"] -= 1
+                    event.app.invalidate()
+                return
+
+            # Context 2: Multi-line input - move cursor up one line
+            if state["is_multiline"]:
+                buffer.cursor_up()
                 event.app.invalidate()
+                return
+
+            # Context 3: Single-line, cursor at start - navigate history
+            if buffer.cursor_position == 0:
+                # Navigate to previous command in history
+                buffer.history_backward()
+                event.app.invalidate()
+                return
+
+            # Context 4: Single-line, cursor not at start - move to start (safety)
+            buffer.cursor_position = 0
+            event.app.invalidate()
+
+        @kb.add("down")
+        def handle_down(event):
+            """Context-dependent down arrow handling."""
+            buffer = event.current_buffer
+
+            # Context 1: Slash command active with > 1 option - navigate menu
+            if state["slash_command_active"] and len(state["completions"]) > 1:
+                if state["selected_idx"] < len(state["completions"]) - 1:
+                    state["selected_idx"] += 1
+                    event.app.invalidate()
+                return
+
+            # Context 2: Multi-line input - move cursor down one line
+            if state["is_multiline"]:
+                buffer.cursor_down()
+                event.app.invalidate()
+                return
+
+            # Context 3: Single-line, cursor at start - navigate history
+            if buffer.cursor_position == 0:
+                # Navigate to next command in history
+                buffer.history_forward()
+                event.app.invalidate()
+                return
+
+            # Context 4: Single-line, cursor not at start - move to start (safety)
+            buffer.cursor_position = 0
+            event.app.invalidate()
+
+        # Mouse wheel routing (context-dependent)
+        # Note: Mouse wheel scrolling in prompt_toolkit is handled automatically
+        # by the windows with mouse_support=True
+
+        # Page Up/Down for output scrolling
+        PAGE_SCROLL_LINES = 10  # Number of lines to scroll per page
+
+        @kb.add("pageup")
+        def scroll_output_up(event):
+            """Scroll output buffer up by one page."""
+            output_buffer.cursor_up(count=PAGE_SCROLL_LINES)
+            event.app.invalidate()
+
+        @kb.add("pagedown")
+        def scroll_output_down(event):
+            """Scroll output buffer down by one page."""
+            output_buffer.cursor_down(count=PAGE_SCROLL_LINES)
+            event.app.invalidate()
 
         @kb.add("tab")
         def do_tab(event):
@@ -522,8 +887,11 @@ class REPL:
             if not text:
                 return
 
-            # Add command to output
-            state["output_lines"].append([("bold", "> "), ("", text)])
+            # Add command to output (with auto-scroll)
+            add_output_line([("bold", "> "), ("", text)])
+            # Reset scroll lock on new command submission
+            state["user_scrolled_output"] = False
+            state["output_scroll_offset"] = 0
 
             # Clear buffer
             buffer.text = ""
@@ -533,7 +901,7 @@ class REPL:
             if text.startswith("/"):
                 command = text[1:]
             elif enable_agent_mode:
-                state["output_lines"].append([("cyan", "Echo: "), ("", text)])
+                add_output_line([("cyan", "Echo: "), ("", text)])
                 event.app.invalidate()
                 return
             else:
@@ -549,7 +917,7 @@ class REPL:
 
             # Handle quit/exit
             if cmd_name in ["quit", "exit"]:
-                state["output_lines"].append([("", "Goodbye!")])
+                add_output_line([("", "Goodbye!")])
                 event.app.invalidate()
                 event.app.exit()
                 return
@@ -563,15 +931,15 @@ class REPL:
                     if cmd_args and cmd_args[0] in cmd.commands:
                         subcmd = cmd.commands[cmd_args[0]]
                         subcmd_args = cmd_args[1:]
-                        self._execute_click_command(subcmd, subcmd_args, state)
+                        self._execute_click_command(subcmd, subcmd_args, state, add_output_line)
                     else:
                         # Just the group name, no subcommand
-                        state["output_lines"].append([("", "")])
+                        add_output_line([("", "")])
                 else:
                     # Regular command
-                    self._execute_click_command(cmd, cmd_args, state)
+                    self._execute_click_command(cmd, cmd_args, state, add_output_line)
             else:
-                state["output_lines"].append([("red", f"Unknown command: {cmd_name}")])
+                add_output_line([("red", f"Unknown command: {cmd_name}")])
 
             event.app.invalidate()
 
@@ -583,10 +951,40 @@ class REPL:
             mouse_support=True,  # Enable mouse scrolling
         )
 
-        app.run()
+        # Store references for API methods
+        self._current_app = app
+        self._current_state = state
 
-    def _execute_click_command(self, cmd, args, state):
-        """Execute a Click command and capture output."""
+        # Global stdout/stderr capture
+        stdout_capture = OutputCapture("stdout", add_output_line, self.config)
+        stderr_capture = OutputCapture("stderr", add_output_line, self.config)
+
+        # Redirect global stdout/stderr
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        sys.stdout = stdout_capture
+        sys.stderr = stderr_capture
+
+        try:
+            app.run()
+        finally:
+            # Restore original streams
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+
+    def _execute_click_command(self, cmd, args, state, add_output_line=None):
+        """Execute a Click command and capture output.
+
+        Args:
+            cmd: The Click command to execute
+            args: Command arguments
+            state: State dictionary
+            add_output_line: Optional callback to add output with auto-scroll
+        """
+        # Fallback to direct append if no callback provided
+        if add_output_line is None:
+            add_output_line = lambda line: state["output_lines"].append(line)
+
         stdout_buf = io.StringIO()
         stderr_buf = io.StringIO()
 
@@ -609,9 +1007,9 @@ class REPL:
         except SystemExit:
             pass
         except click.exceptions.MissingParameter as e:
-            state["output_lines"].append([("red", f"Missing argument: {e.param.name}")])
+            add_output_line([("red", f"Missing argument: {e.param.name}")])
         except Exception as e:
-            state["output_lines"].append([("red", f"Error: {str(e)}")])
+            add_output_line([("red", f"Error: {str(e)}")])
 
         # Add output
         stdout_text = stdout_buf.getvalue()
@@ -619,7 +1017,53 @@ class REPL:
 
         if stdout_text:
             for line in stdout_text.rstrip().split("\n"):
-                state["output_lines"].append([("", line)])
+                add_output_line([("", line)])
         if stderr_text:
             for line in stderr_text.rstrip().split("\n"):
-                state["output_lines"].append([("red", line)])
+                add_output_line([("red", line)])
+
+    # API methods for status and info lines
+
+    def set_status(self, text: str, style: str = ""):
+        """Update status line content.
+
+        Args:
+            text: Text to display
+            style: Optional style (e.g., "yellow", "green bold")
+        """
+        if hasattr(self, "_current_state"):
+            if style:
+                self._current_state["status_text"] = [(style, text)]
+            else:
+                self._current_state["status_text"] = [("", text)]
+            if hasattr(self, "_current_app"):
+                self._current_app.invalidate()
+
+    def clear_status(self):
+        """Clear status line."""
+        if hasattr(self, "_current_state"):
+            self._current_state["status_text"] = []
+            if hasattr(self, "_current_app"):
+                self._current_app.invalidate()
+
+    def set_info(self, text: str, style: str = ""):
+        """Update info line content.
+
+        Args:
+            text: Text to display
+            style: Optional style (e.g., "cyan", "bold")
+        """
+        if hasattr(self, "_current_state"):
+            if style:
+                self._current_state["info_text"] = [(style, text)]
+            else:
+                self._current_state["info_text"] = [("", text)]
+            if hasattr(self, "_current_app"):
+                self._current_app.invalidate()
+
+    def clear_info(self):
+        """Clear info line."""
+        if hasattr(self, "_current_state"):
+            self._current_state["info_text"] = []
+            if hasattr(self, "_current_app"):
+                self._current_app.invalidate()

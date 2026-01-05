@@ -3,6 +3,122 @@
 ## Overview
 Tracking implementation progress for Claude Code-style REPL UI using prompt-toolkit's custom Layout system.
 
+**Latest Update**: 2026-01-05 - Phase D output area fix completed (BufferControl migration)
+
+## NEW IMPLEMENTATION STATUS (2026-01-05)
+
+### Phase A: Foundation - ✅ COMPLETE
+| Component | Status | Details |
+|-----------|--------|---------|
+| Config System | ✅ Complete | Config class with YAML loading, validation, runtime substitution (14 unit tests passing) |
+| config.yaml | ✅ Complete | Full default configuration with all window, color, keybinding settings |
+| 5-Window Layout | ✅ Complete | HSplit with output, status, input, info, menu windows |
+| Config Integration | ✅ Complete | REPL loads config, uses config values for dimensions and colors |
+| Input Max Height Removed | ✅ Complete | Input now grows endlessly (no 10-line limit) |
+| API Methods | ✅ Complete | set_status(), set_info(), clear_status(), clear_info() |
+| State Tracking | ✅ Complete | slash_command_active and is_multiline tracked in state |
+
+### Phase B: Core Interactions - ✅ COMPLETE
+| Component | Status | Details |
+|-----------|--------|---------|
+| Arrow Key Routing | ✅ Complete | Context-dependent: slash/multiline/history/move-to-start |
+| History Navigation | ✅ Complete | Up/Down navigate history when cursor at start (safety feature) |
+| Mouse Wheel | ✅ Complete | Automatic via prompt_toolkit with mouse_support=True |
+| Page Up/Down | ✅ Complete | Automatic scrolling for output window |
+
+### Phase C: Scrolling & Display - ✅ MOSTLY COMPLETE
+| Component | Status | Details |
+|-----------|--------|---------|
+| Output Scrolling | ✅ Complete | Auto-scroll and scroll lock implemented with state tracking |
+| Menu Push Down/Up | ✅ Complete | Dynamic menu height via get_menu_height() function |
+| Page Up/Down | ✅ Complete | scroll_output_up/down handlers implemented |
+| Formatters | ⏭️ Deferred | ANSI/Markdown support - using FormattedText for now (Step 12) |
+
+### Phase C.1: Bug Fixes - ✅ COMPLETE & VALIDATED (2026-01-05)
+| Fix | Status | Details |
+|-----|--------|---------|
+| Input Scrollbar Removed | ✅ Fixed | Removed ConditionalScrollbarMargin from input window |
+| Input Scroll Offsets Removed | ✅ Fixed | Removed ScrollOffsets causing 4-line initial height bug |
+| Configurable Prompt | ✅ Fixed | Prompt character and continuation spacing now from config |
+| Menu Navigation Condition | ✅ Fixed | Changed from "completions exist" to "> 1 option" |
+| Info Height Default | ✅ Fixed | Changed default from 1 to 0 (hidden by default) |
+| Validation Updated | ✅ Fixed | Height validation allows 0 (non-negative instead of positive) |
+| Output Cursor Hidden | ✅ Fixed | Added always_hide_cursor=True to output window |
+| Menu Dynamic Height | ✅ Fixed | get_menu_height() returns dynamic D() based on slash state |
+| Scroll Lock | ✅ Fixed | output_scroll_offset and user_scrolled_output state tracking |
+| Auto-Scroll | ✅ Fixed | add_output_line() helper with auto-scroll logic |
+| Page Up/Down | ✅ Fixed | scroll_output_up/down handlers with PAGE_SCROLL_LINES=10 |
+| Multi-line Cursor | ✅ Fixed | buffer.cursor_up()/cursor_down() for proper movement |
+
+### Phase D: Output Area Fix - ✅ COMPLETE (2026-01-05)
+| Component | Status | Details |
+|-----------|--------|---------|
+| ANSI Colors in Config | ✅ Complete | Added ansi_colors section to config.yaml with 18 color codes + semantic stdout/stderr |
+| ANSIColors Config Class | ✅ Complete | Added ansi_colors to Config._defaults matching config.yaml structure |
+| formatted_to_ansi() Helper | ✅ Complete | Converts FormattedText to ANSI escape codes using config (7 unit tests) |
+| ANSILexer Class | ✅ Complete | Custom Lexer to render ANSI codes as styled text in BufferControl (4 unit tests) |
+| OutputCapture Class | ✅ Complete | Captures global stdout/stderr and redirects to output buffer (5 unit tests) |
+| BufferControl Output Window | ✅ Complete | Replaced FormattedTextControl with BufferControl + ANSILexer for native scrolling |
+| add_output_line() Helper | ✅ Complete | Updated to work with buffer, handles FormattedText and plain text |
+| Global stdout/stderr Redirect | ✅ Complete | Redirects sys.stdout/sys.stderr to OutputCapture for automatic print() capture |
+| Page Up/Down Updated | ✅ Complete | Updated handlers to use buffer.cursor_up/down() |
+| State Management Cleanup | ✅ Complete | Removed output_scroll_offset and user_scrolled_output (BufferControl handles it) |
+| Preserved Existing Code | ✅ Complete | All original output code commented with "PRESERVED:" prefix for future reference |
+
+**Key Achievements:**
+- ✅ Output area now behaves like normal terminal (unlimited scrollback, native scrolling)
+- ✅ Global stdout/stderr capture - `print()` and `logging` output appears automatically
+- ✅ ANSI colors configurable via config.yaml with defaults
+- ✅ Styled output preserved (intro banner colors, error red, etc.)
+- ✅ BufferControl provides native mouse wheel and Page Up/Down scrolling
+- ✅ All original code preserved for future reference
+
+**Implementation Notes:**
+- Used read-only Buffer for display-only output area
+- ANSILexer converts ANSI escape codes to FormattedText for rendering
+- OutputCapture inherits from io.StringIO for stream redirection
+- formatted_to_ansi() maps FormattedText styles to config ANSI codes
+- Page Up/Down scroll by 10 lines (PAGE_SCROLL_LINES constant)
+
+### Test Coverage
+- **Config Tests**: 15/15 passing ✅ (added test_default_ansi_colors)
+- **Custom Layout Tests**: 44/44 passing ✅ (original 28 + 16 new Phase D tests)
+- **All Unit Tests**: 142/142 passing ✅
+- **Import Tests**: Passing ✅
+- **Integration Tests**: Pending (pytest environment issue to resolve)
+
+### Files Modified/Created (New Implementation)
+- `cli_repl_kit/core/config.py` - Config class with YAML loading, ANSI colors (Phase D)
+- `cli_repl_kit/config.yaml` - Default configuration file, ANSI colors section (Phase D)
+- `cli_repl_kit/core/repl.py` - 5-window layout, BufferControl output (Phase D), global stdout/stderr capture
+- `tests/unit/test_config.py` - 15 unit tests for config system (added ANSI colors test)
+- `tests/unit/test_custom_layout.py` - 44 unit tests (added 16 Phase D tests)
+- `pyproject.toml` - Added pyyaml dependency
+
+### Key Achievements
+✅ Full configurability via config.yaml
+✅ 5-window layout with status and info lines
+✅ Context-dependent arrow key routing
+✅ Command history navigation with safety (using buffer.history_backward/forward)
+✅ API for status/info line updates
+✅ No input height limit (grows endlessly)
+✅ Config-driven colors and dimensions
+✅ Configurable prompt with dynamic continuation spacing
+✅ Info window hidden by default (height 0)
+✅ Menu navigation requires > 1 option
+✅ **Phase D:** Terminal-like output area with BufferControl and unlimited scrollback
+✅ **Phase D:** Global stdout/stderr capture - print() and logging output appears automatically
+✅ **Phase D:** ANSI colors configurable via config.yaml with defaults
+✅ **Phase D:** Styled output preserved (intro banner, errors, etc.)
+
+### Known Limitations (Deferred Features)
+- ANSI/Markdown formatters (Step 12) - using FormattedText for now
+- Integration test suite - needs pytest environment fix
+
+---
+
+## ORIGINAL IMPLEMENTATION STATUS (Historical)
+
 ## Phase 1: Core Layout Infrastructure
 
 | Component | Unit Tests | Code | Integration Tests | Unit Results | Integration Results |

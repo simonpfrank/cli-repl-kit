@@ -1,0 +1,104 @@
+# CLI REPL Kit Configuration
+# This file ships with the package and can be customized per project
+
+windows:
+  output:
+    # Takes remaining vertical space (weight=1)
+    scrollable: true
+    auto_scroll_when_at_bottom: true  # Lock to bottom when already at bottom
+    stay_put_when_scrolled_up: true   # Don't auto-scroll if user scrolled up
+    page_up_down_enabled: true
+    history_limit: null  # null = unlimited (terminal limit only)
+    wrap_lines: true
+
+  status:
+    height: 1
+    visible: true  # Can be toggled on/off
+    wrap_lines: false  # Truncate if overflow
+    truncate_overflow: true
+
+  input:
+    initial_height: 1
+    max_height: null  # null = no limit, grows endlessly within terminal
+    wrap_lines: true
+    enable_multiline: true
+    enable_history: true
+    history_navigation_from_start_only: true  # Safety: must be at line start for history
+
+  info:
+    height: 0  # Default 0 (hidden), configurable
+    visible: true  # Can be toggled on/off
+    wrap_lines: false  # Truncate if overflow
+    truncate_overflow: true
+
+  menu:
+    height: 5  # Fixed height
+    wrap_lines: true  # Truncate horizontally
+    truncate_overflow: true
+    min_bottom_buffer: 1  # Minimum 1-line buffer at terminal bottom
+    can_push_down: true  # Menu can be pushed down when input expands
+    can_push_up: true  # Menu can push up if can't push down
+
+colors:
+  highlight: "#6B4FBB"      # Purple for selected completion
+  grey: "#808080"           # Grey for dividers and unselected items
+  error: "red"              # Error messages
+  success: "green"          # Success messages
+  warning: "yellow"         # Warning messages
+  info: "cyan"              # Info messages
+  prompt: "bold"            # Prompt character style
+  divider: "#808080"        # Grey divider lines
+
+ansi_colors:
+  # Standard text styles
+  bold: "\x1b[1m"
+  dim: "\x1b[2m"
+  italic: "\x1b[3m"
+  underline: "\x1b[4m"
+
+  # Foreground colors
+  black: "\x1b[30m"
+  red: "\x1b[31m"
+  green: "\x1b[32m"
+  yellow: "\x1b[33m"
+  blue: "\x1b[34m"
+  magenta: "\x1b[35m"
+  cyan: "\x1b[36m"
+  white: "\x1b[37m"
+
+  # Combined styles (for convenience)
+  cyan_bold: "\x1b[36;1m"
+  green_bold: "\x1b[32;1m"
+  red_bold: "\x1b[31;1m"
+  yellow_bold: "\x1b[33;1m"
+
+  # Special semantic colors
+  stdout: ""                # Default (no color)
+  stderr: "\x1b[31m"        # Red for errors
+
+  reset: "\x1b[0m"
+
+prompt:
+  character: "> "
+  continuation: "  "        # Indent for continuation lines
+
+keybindings:
+  exit: "c-c"               # Ctrl+C to exit
+  clear_input: "escape"     # ESC to clear input
+  newline: "c-j"            # Ctrl+J for newline (Shift+Enter doesn't work)
+  submit: "enter"           # Enter to submit
+  nav_up: "up"              # Navigate completions up
+  nav_down: "down"          # Navigate completions down
+  complete: "tab"           # Tab to complete
+  space: "space"            # Space for command arguments
+
+history:
+  enabled: true
+  file_location: "~/.{app_name}/history"  # {app_name} replaced at runtime
+
+mouse:
+  enabled: true             # Mouse scrolling support
+
+appearance:
+  box_width: 140            # Width of intro banner box
+  full_screen: true         # Full screen mode
