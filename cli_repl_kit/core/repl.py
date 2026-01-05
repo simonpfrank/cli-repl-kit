@@ -375,6 +375,7 @@ class REPL:
             "info_text": [],  # Info line content (FormattedText)
             "slash_command_active": False,  # True when input starts with /
             "is_multiline": False,  # True when input has \n
+            "menu_keep_visible": False,  # Keep menu expanded after command to avoid jarring jumps
         }
 
         # Helper to get argument info for a command
@@ -569,9 +570,15 @@ class REPL:
                 completions = list(completer.get_completions(doc, CompleteEvent()))
                 state["completions"] = completions
                 state["selected_idx"] = 0 if completions else -1
+
+                # Set menu_keep_visible when menu is shown
+                if completions:
+                    state["menu_keep_visible"] = True
             else:
                 state["completions"] = []
                 state["selected_idx"] = -1
+                # Clear menu_keep_visible when user types non-slash
+                state["menu_keep_visible"] = False
 
         # Create input buffer
         input_buffer = Buffer(
@@ -665,12 +672,11 @@ class REPL:
             """Calculate menu height dynamically.
 
             When slash command is active with completions, show full menu height.
-            Otherwise, show 0 height to save space.
-            The layout manager handles push down/up automatically based on
-            available space and weight=1 for output window.
+            Keep menu visible after command execution to avoid jarring position jumps.
+            Only collapse when user explicitly types non-slash input or clears.
             """
-            if state["slash_command_active"] and state["completions"]:
-                # Show full menu when slash command active
+            if (state["slash_command_active"] and state["completions"]) or state["menu_keep_visible"]:
+                # Show full menu when slash command active OR when keeping visible after execution
                 # min=1 ensures at least 1 line visible even when space is tight
                 return D(preferred=menu_preferred_height, min=1)
             else:
@@ -709,6 +715,7 @@ class REPL:
             event.current_buffer.text = ""
             event.current_buffer.cursor_position = 0
             state["placeholder_active"] = False
+            state["menu_keep_visible"] = False  # Collapse menu when clearing input
             event.app.invalidate()
 
         @kb.add("c-j")
