@@ -352,13 +352,44 @@ output_window = Window(
 
 ✅ Grey lines appear both above AND below input area
 ✅ Completion menu appears in fixed area below input (not floating)
-✅ **Shift+Enter** inserts newline in multi-line input (or Ctrl+J if Shift+Enter doesn't work)
+✅ **Ctrl+J** inserts newline in multi-line input (Shift+Enter confirmed not working)
 ✅ **Enter key auto-selects first completion** when typing `/` or `/xxx`
 ✅ **First completion is auto-selected (purple)** without pressing Tab
-✅ Command output appears in scrollable area above input
-✅ **Status area exists** (height=0 initially, expandable later)
+❌ **Command output scrolls up as input area grows** (BROKEN - was working, needs fix)
+✅ Command output appears in area above input
+⏭️ **Status area exists** (height=0 initially, expandable later) - NOT IMPLEMENTED YET
 ✅ **Existing simple-agent styles applied** (purple #6B4FBB, grey #808080)
 ✅ No flickering or layout issues
+
+## Implementation Status (as of latest commit)
+
+### ✅ Completed Features
+- Custom HSplit layout with output, input, menu areas
+- Grey divider lines between all sections
+- Dynamic input height (1 line → 10 lines max)
+- Prompt character `>` with continuation indents
+- ESC key binding to clear input
+- Conditional scrollbar (only shows at 10+ input lines)
+- Tab completion with `<text>` argument placeholders
+- Space after command triggers placeholder
+- Placeholder removal when typing starts
+- Mouse support for scrolling
+- All 15 unit tests passing
+
+### ❌ Known Issues
+
+**CRITICAL: Output scroll broken**
+- **Symptom:** Output area does not scroll up when input area grows from 1→10 lines
+- **Expected:** As input grows, output window should shrink and show fewer lines from bottom of history, creating visual scroll-up effect
+- **Actual:** Output stays fixed, no scrolling occurs despite input area expansion working correctly
+- **Status:** Was working earlier in development, broke during refactoring
+- **Impact:** User cannot see older output when input area is large
+- **Next steps:** Need to debug FormattedTextControl rendering and window height calculations
+
+### ⏭️ Not Yet Implemented
+- Status area between output and input (planned but deferred)
+- Page Up/Down scrolling for output area
+- Configurable colors/themes beyond defaults
 
 ## Additional Requirements Summary
 
