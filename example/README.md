@@ -14,15 +14,15 @@ This demo includes:
 
 ## Installation
 
-From the `examples/hello-world` directory:
+From the `example` directory:
 
 ```bash
 # Make sure cli-repl-kit is installed
-cd ../..
+cd ..
 pip install -e .
 
 # Install the demo app
-cd examples/hello-world
+cd example
 pip install -e .
 ```
 
@@ -80,12 +80,12 @@ blue  Print text in blue
 ## File Structure
 
 ```
-hello-world/
+example/
 ├── pyproject.toml          # Project configuration
-├── hello_world/
-│   ├── __init__.py         # Package init
-│   ├── cli.py              # Entry point
-│   └── commands.py         # Command implementations
+├── __init__.py             # Package init
+├── cli.py                  # Entry point
+├── commands.py             # Command implementations
+├── run.sh                  # Convenience script
 └── README.md               # This file
 ```
 

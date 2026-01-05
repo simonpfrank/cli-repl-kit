@@ -501,7 +501,7 @@ The repository includes a fully working Hello World demo app that showcases all 
 
 ### What the Demo Includes
 
-The demo (`examples/hello-world/`) has:
+The demo (`example/`) has:
 - **4 commands**: `/quit`, `/hello`, `/sub red`, `/sub blue`
 - **Agent mode**: Free text input that echoes back
 - **Colored output**: Red and blue text demonstration
@@ -514,12 +514,12 @@ The demo (`examples/hello-world/`) has:
 
 ```bash
 # Interactive REPL mode
-./examples/hello-world/run.sh
+./example/run.sh
 
 # CLI mode (direct commands)
-./examples/hello-world/run.sh hello "testing"
-./examples/hello-world/run.sh sub red "red text"
-./examples/hello-world/run.sh sub blue "blue text"
+./example/run.sh hello "testing"
+./example/run.sh sub red "red text"
+./example/run.sh sub blue "blue text"
 ```
 
 **Or with Python directly:**
@@ -529,16 +529,16 @@ The demo (`examples/hello-world/`) has:
 cd /path/to/cli-repl-kit
 
 # REPL mode
-PYTHONPATH=src:examples/hello-world python -m hello_world.cli
+PYTHONPATH=.:example python -m example.cli
 
 # CLI mode
-PYTHONPATH=src:examples/hello-world python -m hello_world.cli hello "test"
+PYTHONPATH=.:example python -m example.cli hello "test"
 ```
 
 ### Example Session
 
 ```
-$ ./examples/hello-world/run.sh
+$ ./example/run.sh
 
 Hello World Demo
 Type /help for commands, /quit to exit
@@ -570,13 +570,13 @@ name = "hello-world-demo"
 dependencies = ["cli-repl-kit"]
 
 [project.scripts]
-hello-world = "hello_world.cli:main"
+hello-world = "example.cli:main"
 
 [project.entry-points."repl.commands"]
-hello = "hello_world.commands:HelloCommandsPlugin"
+hello = "example.commands:HelloCommandsPlugin"
 ```
 
-**2. `hello_world/cli.py`** - Entry point (11 lines)
+**2. `example/cli.py`** - Entry point (11 lines)
 ```python
 from cli_repl_kit import REPL
 
@@ -588,7 +588,7 @@ if __name__ == "__main__":
     main()
 ```
 
-**3. `hello_world/commands.py`** - Command implementations (54 lines)
+**3. `example/commands.py`** - Command implementations (54 lines)
 ```python
 import click
 from cli_repl_kit import CommandPlugin
@@ -652,11 +652,11 @@ class HelloCommandsPlugin(CommandPlugin):
 ### Demo File Structure
 
 ```
-examples/hello-world/
+example/
 ├── pyproject.toml          # Package config (entry points, dependencies)
 ├── README.md               # Demo-specific documentation
 ├── run.sh                  # Convenience wrapper script
-└── hello_world/
+└── example/
     ├── __init__.py         # Empty package init
     ├── cli.py              # Entry point (11 lines)
     └── commands.py         # All commands (54 lines)
@@ -668,13 +668,13 @@ examples/hello-world/
 
 To create your own app like this:
 
-1. **Copy the structure**: Use `examples/hello-world` as a template
+1. **Copy the structure**: Use `example/hello-world` as a template
 2. **Modify `pyproject.toml`**: Change name, add dependencies
 3. **Update `cli.py`**: Change app name, toggle agent mode
 4. **Write your commands** in `commands.py`: Define your CommandPlugin
 5. **Install and run**: `pip install -e .` then run your app!
 
-See the [demo's README](examples/hello-world/README.md) for more details.
+See the [demo's README](example/README.md) for more details.
 
 ## API Reference
 
@@ -790,7 +790,7 @@ Contributions are welcome! Please follow these guidelines:
 3. **Document for beginners** - Assume users have basic Python knowledge
 4. **Run tests** before submitting:
    ```bash
-   PYTHONPATH=src python -m pytest tests/unit/ -v
+   PYTHONPATH=. python -m pytest tests/unit/ -v
    ```
 
 ### Development Setup
@@ -805,13 +805,13 @@ pip install -e .
 
 ```bash
 # All tests
-PYTHONPATH=src python -m pytest tests/unit/ -v
+PYTHONPATH=. python -m pytest tests/unit/ -v
 
 # Specific test file
-PYTHONPATH=src python -m pytest tests/unit/test_completion.py -v
+PYTHONPATH=. python -m pytest tests/unit/test_completion.py -v
 
 # With coverage
-PYTHONPATH=src python -m pytest tests/unit/ --cov=src/cli_repl_kit
+PYTHONPATH=. python -m pytest tests/unit/ --cov=cli_repl_kit
 ```
 
 ## License

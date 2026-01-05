@@ -1,7 +1,6 @@
 """Commands for Hello World demo app."""
 import click
 from cli_repl_kit import CommandPlugin
-from rich.console import Console
 
 
 class HelloCommandsPlugin(CommandPlugin):
@@ -13,12 +12,11 @@ class HelloCommandsPlugin(CommandPlugin):
 
     def register(self, cli, context_factory):
         """Register commands with the REPL."""
-        console = Console()
 
         @click.command()
         def quit():
             """Exit the application."""
-            console.print("[dim]Goodbye![/dim]")
+            print("Goodbye!")
             raise SystemExit(0)
 
         @click.command()
@@ -26,7 +24,7 @@ class HelloCommandsPlugin(CommandPlugin):
         def hello(text):
             """Say hello with custom text."""
             message = " ".join(text)
-            console.print(f"hello - {message}")
+            print(f"hello - {message}")
 
         @click.group()
         def sub():
@@ -38,14 +36,14 @@ class HelloCommandsPlugin(CommandPlugin):
         def red(text):
             """Print text in red."""
             message = " ".join(text)
-            console.print(f"[red]{message}[/red]")
+            print(f"RED: {message}")
 
         @sub.command()
         @click.argument("text", nargs=-1, required=True)
         def blue(text):
             """Print text in blue."""
             message = " ".join(text)
-            console.print(f"[blue]{message}[/blue]")
+            print(f"BLUE: {message}")
 
         # Register commands
         cli.add_command(quit, name="quit")

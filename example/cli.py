@@ -1,4 +1,5 @@
 """Entry point for Hello World demo app."""
+
 from cli_repl_kit import REPL
 
 
