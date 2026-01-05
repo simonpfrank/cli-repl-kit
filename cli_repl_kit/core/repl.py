@@ -657,9 +657,17 @@ class REPL:
             wrap_lines=False,  # Truncate overflow
         )
 
+        # Dynamic info height - show 1 line when info text is set, otherwise 0
+        def get_info_height():
+            """Calculate info height dynamically based on whether info is set."""
+            if state["info_text"]:
+                return D(preferred=1, min=1, max=1)
+            else:
+                return D(preferred=0, min=0, max=0)
+
         info_window = Window(
             content=FormattedTextControl(text=render_info),
-            height=self.config.windows.info.height,
+            height=get_info_height,  # Dynamic height based on info text
             wrap_lines=False,  # Truncate overflow
         )
 
@@ -905,14 +913,14 @@ class REPL:
             if "<text>" in text:
                 text = text.replace(" <text>", "").replace("<text>", "")
 
-            # Auto-complete if partial match
+            # Auto-complete if partial match or just "/"
             if state["completions"] and state["selected_idx"] >= 0 and text.startswith("/"):
                 comp = state["completions"][state["selected_idx"]]
                 parts = text.split(maxsplit=1)
                 first_word = parts[0][1:] if parts else ""  # Remove /
 
-                # Only auto-complete if it's a partial match
-                if first_word != comp.text and comp.text.startswith(first_word):
+                # Auto-complete if just "/" or if it's a partial match
+                if text == "/" or (first_word != comp.text and comp.text.startswith(first_word)):
                     text = "/" + comp.text
                     if len(parts) > 1:
                         text += " " + parts[1]
@@ -925,6 +933,9 @@ class REPL:
             # Reset scroll lock on new command submission
             state["user_scrolled_output"] = False
             state["output_scroll_offset"] = 0
+
+            # Add to history before clearing buffer
+            buffer.append_to_history()
 
             # Clear buffer
             buffer.text = ""
