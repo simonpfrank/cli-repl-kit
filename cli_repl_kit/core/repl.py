@@ -123,8 +123,8 @@ class OutputCapture(io.StringIO):
 
         # Add to output with appropriate styling
         if self.stream_type == "stderr":
-            # Red for errors
-            self.output_callback([("red", text)])
+            # Use error color from config
+            self.output_callback([(self.config.colors.error, text)])
         else:
             # Default (no style) for stdout
             self.output_callback([("", text)])
