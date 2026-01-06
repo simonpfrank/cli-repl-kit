@@ -1103,6 +1103,7 @@ class REPL:
                 command = text[1:]
             elif enable_agent_mode:
                 add_output_line([("cyan", "Echo: "), ("", text)])
+                add_output_line([("", "")])  # Add blank line for consistency
                 event.app.invalidate()
                 return
             else:
@@ -1166,6 +1167,7 @@ class REPL:
             # Block execution if validation failed with required level
             if should_block:
                 # Don't add to history, don't clear buffer, don't execute
+                add_output_line([("", "")])  # Add blank line for consistency
                 event.app.invalidate()
                 return
 
@@ -1190,6 +1192,7 @@ class REPL:
                     self.set_status(message)
                 else:
                     self.clear_status()
+                add_output_line([("", "")])  # Add blank line for consistency
                 event.app.invalidate()
                 return
 
@@ -1200,6 +1203,7 @@ class REPL:
                     self.set_info(message)
                 else:
                     self.clear_info()
+                add_output_line([("", "")])  # Add blank line for consistency
                 event.app.invalidate()
                 return
 
