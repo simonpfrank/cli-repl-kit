@@ -20,7 +20,8 @@ A simple, reusable framework for building interactive command-line tools with bo
 ✅ **Beautiful output** - Rich console styling with colors and themes (currently ANSI only)
 ✅ **Dual-mode by default** - REPL and CLI modes work automatically
 ✅ **Plugin-based** - Add commands without modifying framework code
-✅ **Command validation** - Validate arguments before execution with flexible levels
+✅ **Automatic validation** - Validation based on Click decorators, no manual methods needed
+✅ **Mouse selection** - Select and copy output text with Ctrl+O toggle
 ✅ **Subcommand support** - Organize commands with clean arrow notation
 
 ## Installation
@@ -573,20 +574,22 @@ The built-in `/status` and `/info` commands support ANSI escape codes from the c
 
 **Note:** For command output (print statements), use the Rich Console as shown in the "Styling Command Output" section below.
 
-### Command Validation
+### Automatic Validation
 
-Validate command arguments before execution with three flexible levels:
+**NEW!** Validation is now completely automatic based on Click decorators. No manual validation methods needed!
 
-#### Validation Levels
+#### How It Works
 
-- **Required** (`"required"`) - Block invalid commands, show red ● bullet
-- **Optional** (`"optional"`) - Warn but allow execution, show yellow ⚠ icon
-- **None** (`"none"` or default) - No validation, normal execution
+Validation is automatically inferred from your Click command definitions:
+
+- **Required arguments** (`required=True`) → Blocks if missing
+- **Choice types** (`click.Choice([...])`) → Blocks if invalid
+- **Optional arguments** (with `default` or `nargs=-1`) → No validation (allows empty)
 
 #### Example Implementation
 
 ```python
-from cli_repl_kit import CommandPlugin, ValidationResult
+from cli_repl_kit import CommandPlugin
 import click
 
 class MyCommandsPlugin(CommandPlugin):
@@ -596,78 +599,85 @@ class MyCommandsPlugin(CommandPlugin):
 
     def register(self, cli, context_factory):
         @click.command()
-        @click.argument("environment")
+        @click.argument("environment", type=click.Choice(["dev", "staging", "prod"]))
         def deploy(environment):
-            """Deploy to an environment."""
+            """Deploy to an environment (automatically validated!)."""
+            if environment == "prod":
+                click.echo("WARNING: Deploying to PRODUCTION!")
             print(f"Deploying to {environment}...")
 
         @click.command()
-        @click.argument("message", nargs=-1)
-        def echo(message):
-            """Echo a message."""
-            print(" ".join(message))
+        @click.argument("text", nargs=-1, required=True)
+        def hello(text):
+            """Say hello (automatically validated!)."""
+            print(f"Hello, {' '.join(text)}!")
+
+        @click.command()
+        @click.argument("path", nargs=-1)  # No required=True means optional
+        def list_files(path):
+            """List files (no validation - optional path)."""
+            target = " ".join(path) if path else "."
+            print(f"Listing files in {target}")
 
         cli.add_command(deploy, name="deploy")
-        cli.add_command(echo, name="echo")
-
-    def get_validation_config(self):
-        """Configure validation levels for commands."""
-        return {
-            "deploy": "required",  # Block invalid environments
-            "echo": "optional",    # Warn about deprecation
-        }
-
-    def validate_command(self, cmd_name, cmd_args, parsed_args):
-        """Validate command arguments."""
-        if cmd_name == "deploy":
-            # Required validation - block invalid environments
-            allowed = ["dev", "staging", "prod"]
-            env = cmd_args[0] if cmd_args else ""
-            if env not in allowed:
-                return ValidationResult(
-                    status="invalid",
-                    message=f"Environment must be one of: {', '.join(allowed)}"
-                )
-            return ValidationResult(status="valid")
-
-        elif cmd_name == "echo":
-            # Optional validation - warn about deprecation
-            return ValidationResult(
-                status="warning",
-                message="The 'echo' command is deprecated, use 'print' instead"
-            )
-
-        return ValidationResult(status="valid")
+        cli.add_command(hello, name="hello")
+        cli.add_command(list_files, name="list_files")
 ```
 
 #### Output Examples
 
 **Required validation - blocked:**
 ```
-> /deploy testing
-● /deploy
-  ⎿ testing
-✗ Environment must be one of: dev, staging, prod
+> /hello
+✗ Missing required argument: text
 ```
 *(Command not executed, not in history)*
 
-**Optional validation - warning:**
+**Choice validation - blocked:**
 ```
-> /echo hello world
-⚠ /echo
-  ⎿ hello world
-⚠ The 'echo' command is deprecated, use 'print' instead
-hello world
+> /deploy testing
+✗ Invalid value: 'testing' is not one of 'dev', 'staging', 'prod'
 ```
-*(Command executed, added to history)*
+*(Command not executed, not in history)*
 
-**Valid command:**
+**Valid commands:**
 ```
 > /deploy staging
 ● /deploy
   ⎿ staging
 Deploying to staging...
+
+> /hello World
+● /hello
+  ⎿ World
+Hello, World!
+
+> /list_files
+Listing files in .
 ```
+
+#### Validation Levels
+
+Validation level is automatically determined:
+
+- **Required** - Commands with `required=True` args or `click.Choice` types
+- **Optional** - Commands with optional arguments (have defaults)
+- **None** - Commands with no parameters
+
+No manual `get_validation_config()` or `validate_command()` methods needed!
+
+### Mouse Selection in Output Area
+
+**NEW!** You can now select and copy text from the output area using your mouse.
+
+#### How to Use
+
+1. Press **Ctrl+O** to toggle focus to the output area
+2. Click and drag to select text with your mouse
+3. Copy selected text with **Ctrl+C** or **Ctrl+Shift+C**
+4. Press **Ctrl+O** again (or click the input area) to return focus
+
+This is especially useful for copying command output, error messages, or long text blocks.
 
 ### Subcommands with Clean Formatting
 
@@ -969,7 +979,8 @@ repl.cli(sys.argv[1:], standalone_mode=False)
 ### CommandPlugin Class
 
 ```python
-from cli_repl_kit import CommandPlugin, ValidationResult
+from cli_repl_kit import CommandPlugin
+import click
 
 class MyPlugin(CommandPlugin):
     @property
@@ -978,34 +989,28 @@ class MyPlugin(CommandPlugin):
         return "my_plugin"
 
     def register(self, cli, context_factory):
-        """Register commands with the CLI group."""
-        # Add your Click commands here
-        pass
+        """Register commands with the CLI group.
 
-    def get_validation_config(self) -> dict:
-        """Optional: Return validation configuration.
-
-        Returns dict mapping command names to levels:
-        - "required": Validate and block if invalid
-        - "optional": Validate and warn if invalid
-        - "none": No validation (default)
+        Validation is automatic based on Click decorators:
+        - Use required=True for required arguments
+        - Use click.Choice([...]) for enum validation
+        - Use default=value for optional arguments
         """
-        return {}
+        @click.command()
+        @click.argument("name", type=click.Choice(["dev", "prod"]))
+        def deploy(name):
+            """Example with automatic validation."""
+            print(f"Deploying to {name}")
 
-    def validate_command(self, cmd_name, cmd_args, parsed_args):
-        """Optional: Validate command arguments.
-
-        Returns ValidationResult with:
-        - status: "valid", "invalid", or "warning"
-        - message: Optional message to display
-        """
-        return ValidationResult(status="valid")
+        cli.add_command(deploy, name="deploy")
 ```
 
-### ValidationResult Class
+### ValidationResult Class (Internal Use)
+
+The `ValidationResult` class is used internally by the framework. You typically don't need to use it directly since validation is automatic.
 
 ```python
-from cli_repl_kit import ValidationResult
+from cli_repl_kit.plugins.base import ValidationResult
 
 result = ValidationResult(
     status="invalid",  # "valid", "invalid", or "warning"
@@ -1064,11 +1069,14 @@ def my_command(ctx):
     config = ctx.obj["config"]  # Access context
 ```
 
-### Validation not working?
+### Validation not working as expected?
 
-1. Make sure both `get_validation_config()` and `validate_command()` are implemented
-2. Check that command name matches exactly (case-sensitive)
-3. For subcommands, use dot notation: `"config.set"`
+Validation is now automatic based on Click decorators:
+
+1. Use `required=True` for required arguments - missing args will be blocked
+2. Use `click.Choice([...])` for enum validation - invalid choices will be blocked
+3. Check that your Click decorators are correctly applied
+4. For subcommands, validation applies to each subcommand individually
 
 ## Contributing
 

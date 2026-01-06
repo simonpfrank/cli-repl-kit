@@ -80,19 +80,60 @@ Tracking implementation progress for Claude Code-style REPL UI using prompt-tool
 - formatted_to_ansi() maps FormattedText styles to config ANSI codes
 - Page Up/Down scroll by 10 lines (PAGE_SCROLL_LINES constant)
 
+### Phase E: Automatic Validation & Mouse Selection - ✅ COMPLETE (2026-01-06)
+| Component | Status | Details |
+|-----------|--------|---------|
+| ValidationRule Dataclass | ✅ Complete | Auto-generated validation metadata from Click introspection (10 unit tests) |
+| Click Introspection | ✅ Complete | _extract_validation_rule() and _introspect_commands() methods (8 unit tests) |
+| Command Tree Walking | ✅ Complete | Handles Click Groups with subcommands (3 unit tests) |
+| Auto-Validation Execution | ✅ Complete | Uses Click's parse_args() for native validation (10 unit tests) |
+| Plugin Base Cleanup | ✅ Complete | Removed get_validation_config() and validate_command() methods |
+| Example App Updates | ✅ Complete | Removed manual validation, using click.Choice for deploy command |
+| CLI Mode Validation Tests | ✅ Complete | 13 integration tests for CLI mode validation |
+| Mouse Selection | ✅ Complete | Output window focusable with Ctrl+O toggle |
+| Focus Toggle Key Binding | ✅ Complete | Ctrl+O switches between input and output windows |
+| Welcome Banner Update | ✅ Complete | Added Ctrl+O instruction to welcome message |
+
+**Key Achievements:**
+- ✅ Validation now automatic based on Click decorators (required=True, click.Choice, etc.)
+- ✅ No manual validation methods needed in plugins
+- ✅ Consistent validation between CLI and REPL modes
+- ✅ Mouse text selection in output area (Ctrl+O to toggle focus)
+- ✅ Comprehensive test coverage (31 unit + 13 integration tests)
+
+**Implementation Notes:**
+- ValidationRule stores: level, required_args, optional_args, choice_params, etc.
+- Introspection extracts metadata from cmd.params during plugin loading
+- Auto-validation catches Click exceptions: MissingParameter, BadParameter, UsageError
+- Output window now focusable=True and always_hide_cursor=False
+- Ctrl+O key binding toggles focus between input_buffer and output_buffer
+
 ### Test Coverage
-- **Config Tests**: 15/15 passing ✅ (added test_default_ansi_colors)
-- **Custom Layout Tests**: 44/44 passing ✅ (original 28 + 16 new Phase D tests)
-- **All Unit Tests**: 142/142 passing ✅
-- **Import Tests**: Passing ✅
-- **Integration Tests**: Pending (pytest environment issue to resolve)
+- **Config Tests**: 18/18 passing ✅
+- **Custom Layout Tests**: 44/44 passing ✅
+- **Auto-Validation Tests**: 31/31 passing ✅ (Phase E - new)
+- **Validation Result Tests**: 5/5 passing ✅
+- **All Unit Tests**: 138/138 passing ✅
+- **Integration Tests - Auto-Validation**: 13/13 passing ✅ (Phase E - new)
+- **Integration Tests - CLI Mode**: 9/9 passing ✅
+- **All Integration Tests**: 22/22 passing ✅
+- **Total Tests**: 160/160 passing ✅
 
 ### Files Modified/Created (New Implementation)
 - `cli_repl_kit/core/config.py` - Config class with YAML loading, ANSI colors (Phase D)
 - `cli_repl_kit/config.yaml` - Default configuration file, ANSI colors section (Phase D)
-- `cli_repl_kit/core/repl.py` - 5-window layout, BufferControl output (Phase D), global stdout/stderr capture
-- `tests/unit/test_config.py` - 15 unit tests for config system (added ANSI colors test)
+- `cli_repl_kit/core/repl.py` - 5-window layout, BufferControl output (Phase D), auto-validation (Phase E), mouse selection (Phase E)
+- `cli_repl_kit/plugins/validation.py` - ValidationRule dataclass (Phase E - new)
+- `cli_repl_kit/plugins/base.py` - CommandPlugin base class, removed manual validation methods (Phase E)
+- `example/commands.py` - Removed manual validation methods (Phase E)
+- `example/validating_commands.py` - Removed manual validation, using click.Choice (Phase E)
+- `example/pyproject.toml` - Added validating_commands plugin entry point (Phase E)
+- `tests/unit/test_config.py` - 18 unit tests for config system
 - `tests/unit/test_custom_layout.py` - 44 unit tests (added 16 Phase D tests)
+- `tests/unit/test_auto_validation.py` - 31 unit tests for automatic validation (Phase E - new)
+- `tests/unit/test_validation.py` - 5 unit tests for ValidationResult (Phase E - cleaned up)
+- `tests/integration/test_auto_validation_modes.py` - 13 integration tests for CLI validation (Phase E - new)
+- `tests/integration/test_cli_mode.py` - 9 integration tests for CLI mode
 - `pyproject.toml` - Added pyyaml dependency
 
 ### Key Achievements
@@ -110,10 +151,13 @@ Tracking implementation progress for Claude Code-style REPL UI using prompt-tool
 ✅ **Phase D:** Global stdout/stderr capture - print() and logging output appears automatically
 ✅ **Phase D:** ANSI colors configurable via config.yaml with defaults
 ✅ **Phase D:** Styled output preserved (intro banner, errors, etc.)
+✅ **Phase E:** Automatic validation based on Click decorators - no manual validation methods needed
+✅ **Phase E:** Mouse text selection in output area with Ctrl+O toggle
+✅ **Phase E:** Consistent validation between CLI and REPL modes
+✅ **Phase E:** Comprehensive test coverage (160 tests total: 138 unit + 22 integration)
 
 ### Known Limitations (Deferred Features)
 - ANSI/Markdown formatters (Step 12) - using FormattedText for now
-- Integration test suite - needs pytest environment fix
 
 ---
 

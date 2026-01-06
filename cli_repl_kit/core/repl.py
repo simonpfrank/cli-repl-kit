@@ -21,6 +21,7 @@ from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 from prompt_toolkit.lexers import Lexer
 
 from cli_repl_kit.plugins.base import ValidationResult
+from cli_repl_kit.plugins.validation import ValidationRule
 
 
 def formatted_to_ansi(formatted_text, config):
@@ -228,7 +229,7 @@ class REPL:
 
         # Initialize validation system
         self.plugins = []  # List of loaded plugin instances
-        self.command_validators = {}  # Maps command_name -> (plugin, validation_level)
+        self.validation_rules: Dict[str, ValidationRule] = {}  # Maps command_path -> ValidationRule
 
         # Discover and load plugins
         self._load_plugins()
@@ -283,11 +284,162 @@ class REPL:
             # Register the plugin's commands
             plugin.register(self.cli, self.context_factory)
 
-            # Store validation configuration
-            validation_config = plugin.get_validation_config()
-            for cmd_name, validation_level in validation_config.items():
-                if validation_level in ("required", "optional"):
-                    self.command_validators[cmd_name] = (plugin, validation_level)
+        # AUTO-GENERATE validation rules from Click commands
+        self._introspect_commands()
+
+    def _extract_validation_rule(self, cmd: click.Command, cmd_path: str) -> ValidationRule:
+        """Extract validation rule from Click command.
+
+        Args:
+            cmd: Click command object
+            cmd_path: Full command path (e.g., "config.set" for subcommands)
+
+        Returns:
+            ValidationRule with inferred constraints
+        """
+        rule = ValidationRule(
+            level="none",
+            required_args=[],
+            optional_args=[],
+            arg_count_min=0,
+            arg_count_max=0,
+            choice_params={},
+            type_params={},
+            required_options=[],
+            option_names={},
+            click_command=cmd,
+        )
+
+        has_required_params = False
+        has_optional_params = False
+
+        for param in cmd.params:
+            if isinstance(param, click.Argument):
+                # Handle arguments
+                # An argument is required if param.required is True
+                # (Click sets required=False when a default is provided)
+                is_required = param.required
+
+                if is_required:
+                    rule.required_args.append(param.name)
+                    has_required_params = True
+                else:
+                    rule.optional_args.append(param.name)
+                    has_optional_params = True
+
+                # Track argument count constraints
+                if param.nargs == -1:
+                    rule.arg_count_max = -1  # Unlimited
+                else:
+                    nargs = param.nargs if param.nargs else 1
+                    rule.arg_count_min += nargs if is_required else 0
+                    if rule.arg_count_max != -1:
+                        rule.arg_count_max += nargs
+
+                # Track type constraints
+                rule.type_params[param.name] = param.type
+
+                # Track choice constraints
+                if isinstance(param.type, click.Choice):
+                    rule.choice_params[param.name] = list(param.type.choices)
+                    has_required_params = True  # Choices always add validation
+
+            elif isinstance(param, click.Option):
+                # Handle options
+                if param.required:
+                    rule.required_options.append(param.name)
+                    has_required_params = True
+
+                # Store option names (--env, -e)
+                rule.option_names[param.name] = param.opts
+
+                # Track type constraints
+                rule.type_params[param.name] = param.type
+
+                # Track choice constraints
+                if isinstance(param.type, click.Choice):
+                    rule.choice_params[param.name] = list(param.type.choices)
+
+        # Infer validation level
+        if has_required_params:
+            rule.level = "required"  # Block if validation fails
+        elif has_optional_params:
+            rule.level = "optional"  # Warn if validation fails
+        else:
+            rule.level = "none"  # No validation needed
+
+        return rule
+
+    def _introspect_commands(self):
+        """Walk command tree and extract validation rules for all commands."""
+        for cmd_name, cmd in self.cli.commands.items():
+            if isinstance(cmd, click.Group):
+                # Handle group with subcommands
+                for subcmd_name, subcmd in cmd.commands.items():
+                    subcmd_path = f"{cmd_name}.{subcmd_name}"
+                    rule = self._extract_validation_rule(subcmd, subcmd_path)
+                    self.validation_rules[subcmd_path] = rule
+            else:
+                # Regular command
+                rule = self._extract_validation_rule(cmd, cmd_name)
+                self.validation_rules[cmd_name] = rule
+
+    def _validate_command_auto(
+        self, cmd_path: str, cmd_args: List[str]
+    ) -> Tuple[ValidationResult, Optional[str]]:
+        """Validate command using auto-generated rules from Click introspection.
+
+        Args:
+            cmd_path: Command path (e.g., "deploy" or "config.set")
+            cmd_args: Raw argument list from user
+
+        Returns:
+            Tuple of (ValidationResult, validation_level or None)
+        """
+        # Check if command has auto-generated validation rule
+        if cmd_path not in self.validation_rules:
+            return (ValidationResult(status="valid"), None)
+
+        rule = self.validation_rules[cmd_path]
+
+        # No validation needed
+        if rule.level == "none":
+            return (ValidationResult(status="valid"), None)
+
+        # Use Click's native validation by attempting to parse args
+        try:
+            ctx = click.Context(rule.click_command)
+            rule.click_command.parse_args(ctx, cmd_args)
+
+            # Parsing succeeded - command is valid
+            return (ValidationResult(status="valid"), rule.level)
+
+        except click.exceptions.MissingParameter as e:
+            # Required parameter missing
+            return (
+                ValidationResult(
+                    status="invalid",
+                    message=f"Missing required argument: {e.param.name}",
+                ),
+                rule.level,
+            )
+
+        except click.exceptions.BadParameter as e:
+            # Invalid parameter value (e.g., wrong choice, wrong type)
+            return (ValidationResult(status="invalid", message=str(e)), rule.level)
+
+        except click.exceptions.UsageError as e:
+            # General usage error
+            return (ValidationResult(status="invalid", message=str(e)), rule.level)
+
+        except Exception as e:
+            # Unexpected error - treat as validation failure
+            return (
+                ValidationResult(
+                    status="invalid", message=f"Validation error: {str(e)}"
+                ),
+                rule.level,
+            )
 
     def _validate_command(
         self, cmd_name: str, cmd_args: List[str]
@@ -301,25 +453,8 @@ class REPL:
         Returns:
             Tuple of (ValidationResult, validation_level or None)
         """
-        # Check if command has validation configured
-        if cmd_name not in self.command_validators:
-            return (ValidationResult(status="valid"), None)
-
-        plugin, validation_level = self.command_validators[cmd_name]
-
-        # Call plugin's validation method
-        try:
-            # Note: parsed_args can be added later if needed
-            result = plugin.validate_command(cmd_name, cmd_args, parsed_args=None)
-            return (result, validation_level)
-        except Exception as e:
-            # If validation throws, treat as validation error
-            return (
-                ValidationResult(
-                    status="invalid", message=f"Validation error: {str(e)}"
-                ),
-                validation_level,
-            )
+        # Use automatic validation from Click introspection
+        return self._validate_command_auto(cmd_name, cmd_args)
 
     def start(self, prompt_text: str = "> ", enable_agent_mode: bool = False):
         """Start the REPL or execute CLI command.
@@ -420,6 +555,7 @@ class REPL:
             [("cyan", "│"), ("bold", f"    {self.app_name}"), ("yellow", " v0.1.0"), ("", " " * (box_width - len(self.app_name) - 11)), ("cyan", "│")],
             [("cyan", "│"), ("", "    Type "), ("green", "/quit"), ("", " to exit or "), ("green", "/hello <text>"), ("", " to greet"), ("", " " * (box_width - 48)), ("cyan", "│")],
             [("cyan", "│"), ("", "    Press "), ("yellow", "Ctrl+J"), ("", " for multi-line input, "), ("yellow", "Enter"), ("", " to submit"), ("", " " * (box_width - 54)), ("cyan", "│")],
+            [("cyan", "│"), ("", "    Press "), ("yellow", "Ctrl+O"), ("", " to select output text with mouse"), ("", " " * (box_width - 46)), ("cyan", "│")],
             [("cyan", "│" + " " * box_width + "│")],
             [("cyan", "╰" + "─" * box_width + "╯")],
             [("", "")],
@@ -789,13 +925,13 @@ class REPL:
         output_window = Window(
             content=BufferControl(
                 buffer=output_buffer,
-                focusable=False,
+                focusable=True,  # Enable focus for mouse selection (toggle with Ctrl+O)
                 include_default_input_processors=False,
                 lexer=ANSILexer(),  # Render ANSI codes as styled text
             ),
             height=D(weight=1),  # Take remaining space
             wrap_lines=True,
-            always_hide_cursor=True,  # Display only - no cursor
+            always_hide_cursor=False,  # Show cursor when focused for selection
         )
 
         # Function to show prompt (configurable, with dynamic continuation spacing)
@@ -902,6 +1038,15 @@ class REPL:
         @kb.add("c-c")
         def exit_app(event):
             event.app.exit()
+
+        @kb.add("c-o")
+        def toggle_focus(event):
+            """Toggle focus between input and output windows (Ctrl+O for mouse selection)."""
+            app = event.app
+            if app.layout.has_focus(input_buffer):
+                app.layout.focus(output_buffer)
+            else:
+                app.layout.focus(input_buffer)
 
         @kb.add("escape")
         def clear_input(event):

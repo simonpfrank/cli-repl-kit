@@ -15,6 +15,7 @@ hello-world = "example.cli:main"
 
 [project.entry-points."repl.commands"]
 hello = "example.commands:HelloCommandsPlugin"
+validating = "example.validating_commands:ValidatingCommandsPlugin"
 
 [tool.setuptools.packages.find]
 where = ["."]
