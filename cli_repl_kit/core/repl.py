@@ -585,6 +585,28 @@ class REPL:
             has_args = len(parts) > 1
             args_text = parts[1] if has_args else ""
 
+            # Parse subcommands from args
+            subcommand_chain = []
+            remaining_text = args_text
+
+            if has_args and hasattr(self.cli, "commands"):
+                # Try to find subcommands by walking the command tree
+                current_cmd = self.cli.commands.get(cmd_name)
+                arg_words = args_text.split()
+
+                for i, word in enumerate(arg_words):
+                    # Check if current command is a group with this subcommand
+                    if current_cmd and hasattr(current_cmd, "commands") and word in current_cmd.commands:
+                        subcommand_chain.append(word)
+                        current_cmd = current_cmd.commands[word]
+                    else:
+                        # Rest is free text
+                        remaining_text = " ".join(arg_words[i:])
+                        break
+                else:
+                    # All args were subcommands
+                    remaining_text = ""
+
             # Choose icon based on command structure and status
             if has_warning:
                 # Optional validation warning - yellow warning icon
@@ -603,33 +625,37 @@ class REPL:
                     icon = self.config.symbols.command_success  # ●
                     icon_color = self.config.colors.success  # green
 
-            # Build command display line
+            # Build command display line with subcommands
             cmd_display = [
                 (icon_color, icon + " "),
                 (self.config.colors.grey, "/" + cmd_name)
             ]
 
-            # If no args, return single line
-            if not has_args:
+            # Add subcommands with arrow icons
+            arrow = " → "
+            for subcmd in subcommand_chain:
+                cmd_display.append((self.config.colors.grey, arrow + subcmd))
+
+            # If no remaining text, return single line
+            if not remaining_text:
                 return [cmd_display]
 
-            # If has args, add them on next line(s) with indent
+            # If has remaining text, add it on next line with indent
             lines = [cmd_display]
 
-            # Check if args have sub-commands (e.g., "group → subcommand")
-            # For now, just display args with indent symbol
+            # Add remaining text with indent symbol
             indent_symbol = self.config.symbols.indent  # ⎿
             indent_prefix = [(self.config.colors.grey, indent_symbol + " ")]
 
-            # Handle multi-line args
-            arg_lines = args_text.split("\n")
-            for i, arg_line in enumerate(arg_lines):
+            # Handle multi-line remaining text
+            text_lines = remaining_text.split("\n")
+            for i, text_line in enumerate(text_lines):
                 if i == 0:
                     # First line with indent symbol
-                    lines.append(indent_prefix + [("", arg_line)])
+                    lines.append(indent_prefix + [("", text_line)])
                 else:
                     # Continuation lines indented by 2 spaces
-                    lines.append([("", "  " + arg_line)])
+                    lines.append([("", "  " + text_line)])
 
             return lines
 
@@ -1056,12 +1082,18 @@ class REPL:
                 comp = state["completions"][state["selected_idx"]]
                 parts = text.split(maxsplit=1)
                 first_word = parts[0][1:] if parts else ""  # Remove /
+                rest_of_text = parts[1] if len(parts) > 1 else ""
 
                 # Auto-complete if just "/" or if it's a partial match
-                if text == "/" or (first_word != comp.text and comp.text.startswith(first_word)):
+                should_autocomplete = (
+                    text == "/" or  # Just slash
+                    (first_word and first_word != comp.text and comp.text.startswith(first_word))  # Partial match
+                )
+
+                if should_autocomplete:
                     text = "/" + comp.text
-                    if len(parts) > 1:
-                        text += " " + parts[1]
+                    if rest_of_text:
+                        text += " " + rest_of_text
 
             if not text:
                 return
@@ -1083,6 +1115,12 @@ class REPL:
             cmd_name = args[0]
             cmd_args = args[1:]
 
+            # Check if command exists (before validation, so we can show red bullet for unknown commands)
+            command_exists = (
+                cmd_name in ["quit", "exit", "status", "info"] or  # Built-in commands
+                (hasattr(self.cli, "commands") and cmd_name in self.cli.commands)  # Registered commands
+            )
+
             # Validate command before showing icon
             validation_result, validation_level = self._validate_command(cmd_name, cmd_args)
 
@@ -1091,7 +1129,10 @@ class REPL:
             has_warning = False
             has_error = False
 
-            if validation_level == "required" and validation_result.should_block():
+            if not command_exists:
+                # Unknown command - show red bullet
+                has_error = True
+            elif validation_level == "required" and validation_result.should_block():
                 should_block = True
                 has_error = True
             elif validation_level == "optional" and validation_result.should_warn():
