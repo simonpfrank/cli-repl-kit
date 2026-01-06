@@ -1,11 +1,12 @@
 """Core REPL class with plugin discovery."""
 
 from importlib.metadata import entry_points
-from typing import Callable, Dict, Any, Optional
+from typing import Callable, Dict, Any, Optional, Tuple, List
 from pathlib import Path
 import sys
 import io
 import click
+from cli_repl_kit.plugins.base import ValidationResult
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.layout import Layout, HSplit, Window, ScrollOffsets
 from prompt_toolkit.layout.controls import FormattedTextControl, BufferControl
@@ -224,6 +225,10 @@ class REPL:
             default_config = Path(cli_repl_kit.__file__).parent / "config.yaml"
             self.config = Config.load(str(default_config), app_name=app_name)
 
+        # Initialize validation system
+        self.plugins = []  # List of loaded plugin instances
+        self.command_validators = {}  # Maps command_name -> (plugin, validation_level)
+
         # Discover and load plugins
         self._load_plugins()
 
@@ -271,8 +276,49 @@ class REPL:
             # Instantiate the plugin
             plugin = plugin_class()
 
+            # Store plugin instance
+            self.plugins.append(plugin)
+
             # Register the plugin's commands
             plugin.register(self.cli, self.context_factory)
+
+            # Store validation configuration
+            validation_config = plugin.get_validation_config()
+            for cmd_name, validation_level in validation_config.items():
+                if validation_level in ("required", "optional"):
+                    self.command_validators[cmd_name] = (plugin, validation_level)
+
+    def _validate_command(
+        self, cmd_name: str, cmd_args: List[str]
+    ) -> Tuple[ValidationResult, Optional[str]]:
+        """Validate command before execution.
+
+        Args:
+            cmd_name: Command name (e.g., "deploy", "config.set")
+            cmd_args: List of command arguments
+
+        Returns:
+            Tuple of (ValidationResult, validation_level or None)
+        """
+        # Check if command has validation configured
+        if cmd_name not in self.command_validators:
+            return (ValidationResult(status="valid"), None)
+
+        plugin, validation_level = self.command_validators[cmd_name]
+
+        # Call plugin's validation method
+        try:
+            # Note: parsed_args can be added later if needed
+            result = plugin.validate_command(cmd_name, cmd_args, parsed_args=None)
+            return (result, validation_level)
+        except Exception as e:
+            # If validation throws, treat as validation error
+            return (
+                ValidationResult(
+                    status="invalid", message=f"Validation error: {str(e)}"
+                ),
+                validation_level,
+            )
 
     def start(self, prompt_text: str = "> ", enable_agent_mode: bool = False):
         """Start the REPL or execute CLI command.
@@ -515,12 +561,13 @@ class REPL:
                 cursor_position=len(new_text)
             )
 
-        def format_command_display(command_text, has_error=False):
+        def format_command_display(command_text, has_error=False, has_warning=False):
             """Format command for display with icons and proper styling.
 
             Args:
                 command_text: The full command text (with or without /)
-                has_error: Whether the command resulted in an error
+                has_error: Whether the command resulted in an error (red bullet)
+                has_warning: Whether the command has a warning (yellow warning icon)
 
             Returns:
                 List of lines to display (each line is FormattedText)
@@ -538,21 +585,23 @@ class REPL:
             has_args = len(parts) > 1
             args_text = parts[1] if has_args else ""
 
-            # Choose icon based on command structure
-            if has_args:
+            # Choose icon based on command structure and status
+            if has_warning:
+                # Optional validation warning - yellow warning icon
+                icon = self.config.symbols.warning  # ⚠
+                icon_color = self.config.colors.warning  # yellow
+            elif has_args:
+                # Command with arguments - grey square
                 icon = self.config.symbols.command_with_args  # ■
+                icon_color = self.config.colors.grey
             else:
-                # For simple commands, use success/error icons with color
+                # Simple command - success/error icon with color
                 if has_error:
                     icon = self.config.symbols.command_error  # ●
                     icon_color = self.config.colors.error  # red
                 else:
                     icon = self.config.symbols.command_success  # ●
                     icon_color = self.config.colors.success  # green
-
-            # For commands with args, icon is always grey (success/error shown in output)
-            if has_args:
-                icon_color = self.config.colors.grey
 
             # Build command display line
             cmd_display = [
@@ -1017,23 +1066,7 @@ class REPL:
             if not text:
                 return
 
-            # Format and display command with icons
-            formatted_lines = format_command_display(text, has_error=False)
-            for line in formatted_lines:
-                add_output_line(line)
-
-            # Reset scroll lock on new command submission
-            state["user_scrolled_output"] = False
-            state["output_scroll_offset"] = 0
-
-            # Add to history before clearing buffer
-            buffer.append_to_history()
-
-            # Clear buffer
-            buffer.text = ""
-            state["placeholder_active"] = False
-
-            # Parse and execute
+            # Parse command name and args early for validation
             if text.startswith("/"):
                 command = text[1:]
             elif enable_agent_mode:
@@ -1045,11 +1078,62 @@ class REPL:
 
             args = command.split()
             if not args:
-                event.app.invalidate()
                 return
 
             cmd_name = args[0]
             cmd_args = args[1:]
+
+            # Validate command before showing icon
+            validation_result, validation_level = self._validate_command(cmd_name, cmd_args)
+
+            # Determine if command should be blocked
+            should_block = False
+            has_warning = False
+            has_error = False
+
+            if validation_level == "required" and validation_result.should_block():
+                should_block = True
+                has_error = True
+            elif validation_level == "optional" and validation_result.should_warn():
+                has_warning = True
+                has_error = False
+            else:
+                has_error = False
+
+            # Format and display command with appropriate icon
+            formatted_lines = format_command_display(
+                text, has_error=has_error, has_warning=has_warning
+            )
+            for line in formatted_lines:
+                add_output_line(line)
+
+            # Display validation message if present
+            if validation_result.message:
+                if should_block:
+                    add_output_line(
+                        [("red", f"{self.config.symbols.error} {validation_result.message}")]
+                    )
+                elif has_warning:
+                    add_output_line(
+                        [("yellow", f"{self.config.symbols.warning} {validation_result.message}")]
+                    )
+
+            # Reset scroll lock on new command submission
+            state["user_scrolled_output"] = False
+            state["output_scroll_offset"] = 0
+
+            # Block execution if validation failed with required level
+            if should_block:
+                # Don't add to history, don't clear buffer, don't execute
+                event.app.invalidate()
+                return
+
+            # Add to history before clearing buffer (only if not blocked)
+            buffer.append_to_history()
+
+            # Clear buffer
+            buffer.text = ""
+            state["placeholder_active"] = False
 
             # Handle quit/exit
             if cmd_name in ["quit", "exit"]:

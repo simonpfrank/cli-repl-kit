@@ -16,11 +16,12 @@ __version__ = "0.1.0"
 
 # Main exports
 from cli_repl_kit.core.repl import REPL
-from cli_repl_kit.plugins.base import CommandPlugin
+from cli_repl_kit.plugins.base import CommandPlugin, ValidationResult
 from cli_repl_kit.core.completion import SlashCommandCompleter
 
 __all__ = [
     "REPL",
     "CommandPlugin",
+    "ValidationResult",
     "SlashCommandCompleter",
 ]
