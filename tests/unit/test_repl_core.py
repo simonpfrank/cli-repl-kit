@@ -1,7 +1,7 @@
 """Unit tests for the REPL core class."""
-import pytest
+from unittest.mock import Mock, patch
+
 import click
-from unittest.mock import Mock, patch, MagicMock
 
 
 def test_repl_initialization_with_app_name():
@@ -16,7 +16,9 @@ def test_repl_initialization_with_context_factory():
     """Test that REPL accepts a context factory."""
     from cli_repl_kit.core.repl import REPL
 
-    context_factory = lambda: {"test": "context"}
+    def context_factory():
+        return {"test": "context"}
+
     repl = REPL(app_name="Test App", context_factory=context_factory)
     assert repl.context_factory() == {"test": "context"}
 
@@ -156,8 +158,10 @@ def test_repl_passes_context_factory_to_plugins(mock_entry_points):
     mock_ep.load.return_value = TestPlugin
     mock_entry_points.return_value = [mock_ep]
 
-    context_factory = lambda: {"test": "data"}
-    repl = REPL(app_name="Test App", context_factory=context_factory)
+    def context_factory():
+        return {"test": "data"}
+
+    REPL(app_name="Test App", context_factory=context_factory)
 
     # Verify context factory was passed to plugin
     assert len(context_factory_called) == 1

@@ -19,6 +19,8 @@ A simple, reusable framework for building interactive command-line tools with bo
 ✅ **Beautiful output** - Rich console styling with colors and themes
 ✅ **Dual-mode by default** - REPL and CLI modes work automatically
 ✅ **Plugin-based** - Add commands without modifying framework code
+✅ **Command validation** - Validate arguments before execution with flexible levels
+✅ **Subcommand support** - Organize commands with clean arrow notation
 
 ## Installation
 
@@ -72,12 +74,27 @@ my_commands = "my_cli_app.commands:MyCommandsPlugin"
 
 ```python
 """Entry point for your CLI/REPL."""
+import sys
 from cli_repl_kit import REPL
 
 def main():
-    """Start the CLI/REPL."""
+    """Start the CLI/REPL.
+
+    Supports both modes:
+    - CLI mode: When called with arguments
+    - REPL mode: When called without arguments (interactive)
+    """
     repl = REPL(app_name="My CLI App")
-    repl.start()
+
+    # If arguments provided, run in CLI mode
+    if len(sys.argv) > 1:
+        try:
+            repl.cli(sys.argv[1:], standalone_mode=False)
+        except SystemExit as e:
+            sys.exit(e.code)
+    else:
+        # No arguments - enter REPL mode
+        repl.start()
 
 if __name__ == "__main__":
     main()
@@ -88,7 +105,7 @@ if __name__ == "__main__":
 ```python
 """Commands for your application."""
 import click
-from cli_repl_kit import CommandPlugin, format_success, format_info
+from cli_repl_kit import CommandPlugin
 
 class MyCommandsPlugin(CommandPlugin):
     """My application commands."""
@@ -104,12 +121,12 @@ class MyCommandsPlugin(CommandPlugin):
         @click.argument("name")
         def greet(name):
             """Greet someone by name."""
-            print(format_success(f"Hello, {name}!"))
+            print(f"Hello, {name}!")
 
         @click.command()
         def info():
             """Show application info."""
-            print(format_info("My CLI App v0.1.0"))
+            print("My CLI App v0.1.0")
 
         cli.add_command(greet, name="greet")
         cli.add_command(info, name="info")
@@ -124,20 +141,25 @@ pip install -e .
 # Run in REPL mode (interactive)
 my-cli
 > /greet Alice
-✓ Hello, Alice!
+● /greet
+  ⎿ Alice
+Hello, Alice!
+
 > /info
-ℹ My CLI App v0.1.0
+● /info
+My CLI App v0.1.0
+
 > /quit
 
 # Run in CLI mode (direct commands)
 my-cli greet Bob
-✓ Hello, Bob!
+Hello, Bob!
 
 my-cli info
-ℹ My CLI App v0.1.0
+My CLI App v0.1.0
 ```
 
-That's it! You now have a working CLI/REPL app with tab completion and colored output.
+That's it! You now have a working CLI/REPL app with tab completion and styled output.
 
 ## Core Concepts (Explained Simply)
 
@@ -215,73 +237,7 @@ def show_config(ctx):
     print(config)
 ```
 
-## Step-by-Step Guide: Adding cli-repl-kit to Your Project
-
-### Step 1: Add dependency
-
-```toml
-# pyproject.toml
-[project]
-dependencies = [
-    "cli-repl-kit @ git+https://github.com/simonpfrank/cli-repl-kit.git@main",
-]
-```
-
-### Step 2: Create entry point
-
-```python
-# my_project/cli.py
-from cli_repl_kit import REPL
-
-def main():
-    repl = REPL(app_name="My Project")
-    repl.start()
-```
-
-### Step 3: Declare script in pyproject.toml
-
-```toml
-[project.scripts]
-my-cli = "my_project.cli:main"
-```
-
-### Step 4: Create command plugin
-
-```python
-# my_project/commands.py
-import click
-from cli_repl_kit import CommandPlugin
-
-class MyCommandsPlugin(CommandPlugin):
-    @property
-    def name(self):
-        return "my_commands"
-
-    def register(self, cli, context_factory):
-        @click.command()
-        def hello():
-            """Say hello."""
-            print("Hello!")
-
-        cli.add_command(hello, name="hello")
-```
-
-### Step 5: Register plugin in pyproject.toml
-
-```toml
-[project.entry-points."repl.commands"]
-my_commands = "my_project.commands:MyCommandsPlugin"
-```
-
-### Step 6: Install and test
-
-```bash
-pip install -e .
-my-cli        # REPL mode
-my-cli hello  # CLI mode
-```
-
-## Features in Detail
+## Key Features
 
 ### Tab Completion
 
@@ -289,8 +245,8 @@ cli-repl-kit provides automatic tab completion with `/` prefix (Claude Code styl
 
 ```
 > /h<TAB>
-/help     Show available commands
-/history  Show command history
+/hello     Say hello with custom text
+/help      Show available commands
 
 > /config <TAB>
 show  Show configuration
@@ -304,45 +260,105 @@ save  Save configuration
 
 **No configuration needed** - works automatically for all Click commands!
 
-### Styling and Formatting
+### Command Validation
 
-cli-repl-kit includes Rich console styling for beautiful terminal output:
+Validate command arguments before execution with three flexible levels:
+
+#### Validation Levels
+
+- **Required** (`"required"`) - Block invalid commands, show red ● bullet
+- **Optional** (`"optional"`) - Warn but allow execution, show yellow ⚠ icon
+- **None** (`"none"` or default) - No validation, normal execution
+
+#### Example Implementation
 
 ```python
-from cli_repl_kit import (
-    format_success,  # Green checkmark
-    format_error,    # Red cross
-    format_warning,  # Yellow warning
-    format_info      # Blue info
-)
+from cli_repl_kit import CommandPlugin, ValidationResult
+import click
 
-print(format_success("Operation completed!"))
-# ✓ Operation completed!
+class MyCommandsPlugin(CommandPlugin):
+    @property
+    def name(self):
+        return "my_commands"
 
-print(format_error("Something went wrong"))
-# ✗ Error: Something went wrong
+    def register(self, cli, context_factory):
+        @click.command()
+        @click.argument("environment")
+        def deploy(environment):
+            """Deploy to an environment."""
+            print(f"Deploying to {environment}...")
 
-print(format_warning("Please be careful"))
-# ⚠ Warning: Please be careful
+        @click.command()
+        @click.argument("message", nargs=-1)
+        def echo(message):
+            """Echo a message."""
+            print(" ".join(message))
 
-print(format_info("Here's some information"))
-# ℹ Here's some information
+        cli.add_command(deploy, name="deploy")
+        cli.add_command(echo, name="echo")
+
+    def get_validation_config(self):
+        """Configure validation levels for commands."""
+        return {
+            "deploy": "required",  # Block invalid environments
+            "echo": "optional",    # Warn about deprecation
+        }
+
+    def validate_command(self, cmd_name, cmd_args, parsed_args):
+        """Validate command arguments."""
+        if cmd_name == "deploy":
+            # Required validation - block invalid environments
+            allowed = ["dev", "staging", "prod"]
+            env = cmd_args[0] if cmd_args else ""
+            if env not in allowed:
+                return ValidationResult(
+                    status="invalid",
+                    message=f"Environment must be one of: {', '.join(allowed)}"
+                )
+            return ValidationResult(status="valid")
+
+        elif cmd_name == "echo":
+            # Optional validation - warn about deprecation
+            return ValidationResult(
+                status="warning",
+                message="The 'echo' command is deprecated, use 'print' instead"
+            )
+
+        return ValidationResult(status="valid")
 ```
 
-**Custom themes**:
-```python
-from cli_repl_kit import APP_THEME
-from rich.console import Console
+#### Output Examples
 
-console = Console(theme=APP_THEME)
-console.print("[success]Success![/success]")  # Green
-console.print("[error]Error![/error]")        # Red
-console.print("[warning]Warning![/warning]")  # Yellow
+**Required validation - blocked:**
+```
+> /deploy testing
+● /deploy
+  ⎿ testing
+✗ Environment must be one of: dev, staging, prod
+```
+*(Command not executed, not in history)*
+
+**Optional validation - warning:**
+```
+> /echo hello world
+⚠ /echo
+  ⎿ hello world
+⚠ The 'echo' command is deprecated, use 'print' instead
+hello world
+```
+*(Command executed, added to history)*
+
+**Valid command:**
+```
+> /deploy staging
+● /deploy
+  ⎿ staging
+Deploying to staging...
 ```
 
-### Subcommands and Groups
+### Subcommands with Clean Formatting
 
-Organize related commands into groups:
+Organize related commands into groups with automatic arrow notation:
 
 ```python
 import click
@@ -373,57 +389,28 @@ class ConfigCommandsPlugin(CommandPlugin):
         cli.add_command(config, name="config")
 ```
 
-**Usage**:
+**Output with automatic arrow formatting:**
 ```
 > /config show
+■ /config → show
 Current config...
 
 > /config load --file config.yaml
+■ /config → load
+  ⎿ --file config.yaml
 Loading from config.yaml...
 ```
 
-## Examples
+Subcommands are automatically detected and formatted with arrow icons (→) for clarity!
 
-### Example 1: Calculator App
+### Calling External Commands
 
-```python
-# calculator/commands.py
-import click
-from cli_repl_kit import CommandPlugin, format_success
-
-class CalculatorPlugin(CommandPlugin):
-    @property
-    def name(self):
-        return "calculator"
-
-    def register(self, cli, context_factory):
-        @click.command()
-        @click.argument("a", type=float)
-        @click.argument("b", type=float)
-        def add(a, b):
-            """Add two numbers."""
-            result = a + b
-            print(format_success(f"{a} + {b} = {result}"))
-
-        @click.command()
-        @click.argument("a", type=float)
-        @click.argument("b", type=float)
-        def multiply(a, b):
-            """Multiply two numbers."""
-            result = a * b
-            print(format_success(f"{a} × {b} = {result}"))
-
-        cli.add_command(add, name="add")
-        cli.add_command(multiply, name="multiply")
-```
-
-### Example 2: File Manager App
+Easily integrate command-line tools using subprocess:
 
 ```python
-# filemanager/commands.py
 import click
-import os
-from cli_repl_kit import CommandPlugin, format_success, format_error
+import subprocess
+from cli_repl_kit import CommandPlugin
 
 class FileCommandsPlugin(CommandPlugin):
     @property
@@ -432,249 +419,119 @@ class FileCommandsPlugin(CommandPlugin):
 
     def register(self, cli, context_factory):
         @click.command()
-        def list_files():
-            """List files in current directory."""
-            files = os.listdir(".")
-            for f in files:
-                print(f"  • {f}")
-
-        @click.command()
-        @click.argument("filename")
-        def read(filename):
-            """Read a file."""
+        @click.argument("path", default=".")
+        def list_files(path):
+            """List files in a directory."""
             try:
-                with open(filename, "r") as f:
-                    print(f.read())
-            except FileNotFoundError:
-                print(format_error(f"File '{filename}' not found"))
+                result = subprocess.run(
+                    ["ls", "-la", path],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                print(result.stdout)
+            except subprocess.CalledProcessError as e:
+                print(f"Error: {e.stderr}")
 
-        cli.add_command(list_files, name="ls")
-        cli.add_command(read, name="read")
+        cli.add_command(list_files, name="list_files")
 ```
 
-### Example 3: App with Context (Database Connection)
-
-```python
-# myapp/cli.py
-from cli_repl_kit import REPL
-from myapp.database import connect_db
-
-def context_factory():
-    """Create context with database connection."""
-    return {
-        "db": connect_db(),
-        "user": "admin"
-    }
-
-def main():
-    repl = REPL(
-        app_name="My Database App",
-        context_factory=context_factory
-    )
-    repl.start()
-
-# myapp/commands.py
-import click
-from cli_repl_kit import CommandPlugin
-
-class DatabaseCommandsPlugin(CommandPlugin):
-    @property
-    def name(self):
-        return "database"
-
-    def register(self, cli, context_factory):
-        @click.command()
-        @click.pass_context
-        def users(ctx):
-            """List all users."""
-            db = ctx.obj["db"]
-            users = db.query("SELECT * FROM users")
-            for user in users:
-                print(f"  • {user['name']}")
-
-        cli.add_command(users, name="users")
+**Output:**
+```
+> /list_files
+■ /list_files
+total 48
+drwxr-xr-x  12 user  staff   384 Jan  6 10:30 .
+drwxr-xr-x   8 user  staff   256 Jan  5 15:20 ..
+-rw-r--r--   1 user  staff  1234 Jan  6 09:15 README.md
+...
 ```
 
-## Try the Live Demo: Hello World Example
+The REPL automatically captures and displays all output from external commands!
 
-The repository includes a fully working Hello World demo app that showcases all framework features.
+## Try the Live Demo
 
-### What the Demo Includes
-
-The demo (`example/`) has:
-- **4 commands**: `/quit`, `/hello`, `/sub red`, `/sub blue`
-- **Agent mode**: Free text input that echoes back
-- **Colored output**: Red and blue text demonstration
-- **Tab completion**: All commands with `/` prefix
-- **Dual-mode**: Works as both REPL and CLI
+The repository includes a fully working demo app that showcases all framework features.
 
 ### Running the Demo
 
-**From the repository root:**
-
 ```bash
+# Clone the repository
+git clone https://github.com/simonpfrank/cli-repl-kit.git
+cd cli-repl-kit
+
+# Install in development mode
+pip install -e .
+
 # Interactive REPL mode
-./example/run.sh
+python -m example.cli
 
 # CLI mode (direct commands)
-./example/run.sh hello "testing"
-./example/run.sh sub red "red text"
-./example/run.sh sub blue "blue text"
+python -m example.cli hello World
+python -m example.cli list_files
+python -m example.cli sub red "red text"
 ```
 
-**Or with Python directly:**
+### Demo Features
 
-```bash
-# Make sure you're in the cli-repl-kit root directory
-cd /path/to/cli-repl-kit
-
-# REPL mode
-PYTHONPATH=.:example python -m example.cli
-
-# CLI mode
-PYTHONPATH=.:example python -m example.cli hello "test"
-```
+The demo includes:
+- **Command validation** - Try `/print` without arguments (required validation)
+- **Subcommands** - Try `/sub red text` (automatic arrow formatting)
+- **External commands** - Try `/list_files` (subprocess integration)
+- **Tab completion** - Type `/` and press TAB
+- **Agent mode** - Type text without `/` prefix for echo
 
 ### Example Session
 
 ```
-$ ./example/run.sh
+$ python -m example.cli
 
 Hello World Demo
 Type /help for commands, /quit to exit
 
-> /hello world
-hello - world
+> /hello World
+■ /hello
+  ⎿ World
+hello - World
 
-> /sub red this text appears in red
-this text appears in red
+> /sub red This text is red
+■ /sub → red
+  ⎿ This text is red
+RED: This text is red
 
-> /sub blue this text appears in blue
-this text appears in blue
+> /list_files example
+■ /list_files
+  ⎿ example
+total 24
+-rw-r--r--  1 user  staff   892 Jan  6 10:30 cli.py
+-rw-r--r--  1 user  staff  2145 Jan  6 09:45 commands.py
+...
 
-> just typing some text without a slash
-Echo: just typing some text without a slash
+> /print
+● /print
+✗ Text argument is required for print command
+
+> /hello
+⚠ /hello
+⚠ Tip: Try '/hello World' with a name for a custom greeting!
+hello - (no text provided)
+
+> just some text without a slash
+Echo: just some text without a slash
 
 > /quit
 Goodbye!
 ```
 
-### How the Demo Was Made
+### Demo Code
 
-The demo consists of only **3 small files** (plus config):
+The entire demo is just **3 small files** (~100 lines total):
 
-**1. `pyproject.toml`** - Package configuration
-```toml
-[project]
-name = "hello-world-demo"
-dependencies = ["cli-repl-kit"]
+1. **`example/cli.py`** - Entry point with dual-mode support
+2. **`example/commands.py`** - All commands including validation
+3. **`pyproject.toml`** - Package configuration with entry points
 
-[project.scripts]
-hello-world = "example.cli:main"
-
-[project.entry-points."repl.commands"]
-hello = "example.commands:HelloCommandsPlugin"
-```
-
-**2. `example/cli.py`** - Entry point (11 lines)
-```python
-from cli_repl_kit import REPL
-
-def main():
-    repl = REPL(app_name="Hello World Demo")
-    repl.start(enable_agent_mode=True)  # Enable free text input
-
-if __name__ == "__main__":
-    main()
-```
-
-**3. `example/commands.py`** - Command implementations (54 lines)
-```python
-import click
-from cli_repl_kit import CommandPlugin
-from rich.console import Console
-
-class HelloCommandsPlugin(CommandPlugin):
-    @property
-    def name(self):
-        return "hello_commands"
-
-    def register(self, cli, context_factory):
-        console = Console()
-
-        @click.command()
-        def quit():
-            """Exit the application."""
-            console.print("[dim]Goodbye![/dim]")
-            raise SystemExit(0)
-
-        @click.command()
-        @click.argument("text", nargs=-1, required=True)
-        def hello(text):
-            """Say hello with custom text."""
-            message = " ".join(text)
-            console.print(f"hello - {message}")
-
-        @click.group()
-        def sub():
-            """Colored text subcommands."""
-            pass
-
-        @sub.command()
-        @click.argument("text", nargs=-1, required=True)
-        def red(text):
-            """Print text in red."""
-            message = " ".join(text)
-            console.print(f"[red]{message}[/red]")
-
-        @sub.command()
-        @click.argument("text", nargs=-1, required=True)
-        def blue(text):
-            """Print text in blue."""
-            message = " ".join(text)
-            console.print(f"[blue]{message}[/blue]")
-
-        cli.add_command(quit, name="quit")
-        cli.add_command(hello, name="hello")
-        cli.add_command(sub, name="sub")
-```
-
-### Key Takeaways from the Demo
-
-1. **Minimal code**: Just 3 small files to create a full-featured CLI/REPL
-2. **Automatic discovery**: Entry points in `pyproject.toml` mean no manual registration
-3. **Works both ways**: Same code works as interactive REPL and direct CLI
-4. **Tab completion**: Free with the framework - no configuration needed
-5. **Colored output**: Rich integration makes styling trivial
-6. **Subcommands**: Click groups work seamlessly (`/sub red`, `/sub blue`)
-7. **Agent mode**: Toggle free text input with one parameter
-
-### Demo File Structure
-
-```
-example/
-├── pyproject.toml          # Package config (entry points, dependencies)
-├── README.md               # Demo-specific documentation
-├── run.sh                  # Convenience wrapper script
-└── example/
-    ├── __init__.py         # Empty package init
-    ├── cli.py              # Entry point (11 lines)
-    └── commands.py         # All commands (54 lines)
-```
-
-**Total: ~65 lines of actual code for a complete CLI/REPL app!**
-
-### Building Your Own App
-
-To create your own app like this:
-
-1. **Copy the structure**: Use `example/hello-world` as a template
-2. **Modify `pyproject.toml`**: Change name, add dependencies
-3. **Update `cli.py`**: Change app name, toggle agent mode
-4. **Write your commands** in `commands.py`: Define your CommandPlugin
-5. **Install and run**: `pip install -e .` then run your app!
-
-See the [demo's README](example/README.md) for more details.
+See [`example/`](example/) directory for the complete implementation!
 
 ## API Reference
 
@@ -690,13 +547,17 @@ repl = REPL(
     plugin_group="repl.commands"     # Optional: Entry point group name
 )
 
-repl.start()  # Start REPL or execute CLI command
+# For REPL mode
+repl.start(enable_agent_mode=False)
+
+# For CLI mode (call from main with sys.argv)
+repl.cli(sys.argv[1:], standalone_mode=False)
 ```
 
 ### CommandPlugin Class
 
 ```python
-from cli_repl_kit import CommandPlugin
+from cli_repl_kit import CommandPlugin, ValidationResult
 
 class MyPlugin(CommandPlugin):
     @property
@@ -706,32 +567,42 @@ class MyPlugin(CommandPlugin):
 
     def register(self, cli, context_factory):
         """Register commands with the CLI group."""
-        # Add your commands here
+        # Add your Click commands here
         pass
+
+    def get_validation_config(self) -> dict:
+        """Optional: Return validation configuration.
+
+        Returns dict mapping command names to levels:
+        - "required": Validate and block if invalid
+        - "optional": Validate and warn if invalid
+        - "none": No validation (default)
+        """
+        return {}
+
+    def validate_command(self, cmd_name, cmd_args, parsed_args):
+        """Optional: Validate command arguments.
+
+        Returns ValidationResult with:
+        - status: "valid", "invalid", or "warning"
+        - message: Optional message to display
+        """
+        return ValidationResult(status="valid")
 ```
 
-### SlashCommandCompleter
+### ValidationResult Class
 
 ```python
-from cli_repl_kit import SlashCommandCompleter
+from cli_repl_kit import ValidationResult
 
-completer = SlashCommandCompleter(
-    commands={"help": "Show help", "quit": "Exit"},  # Command dict
-    cli_group=None  # Optional: Click group for subcommand completion
+result = ValidationResult(
+    status="invalid",  # "valid", "invalid", or "warning"
+    message="Error description"
 )
-```
 
-### Styling Functions
-
-```python
-from cli_repl_kit import (
-    format_success,   # Green ✓ with message
-    format_error,     # Red ✗ with "Error:" label
-    format_warning,   # Yellow ⚠ with "Warning:" label
-    format_info,      # Blue ℹ with message
-    APP_THEME,        # Rich Theme object
-    SYMBOLS           # Dict of Unicode symbols
-)
+result.is_valid()      # True if status is "valid" or "warning"
+result.should_block()  # True if status is "invalid"
+result.should_warn()   # True if status is "warning"
 ```
 
 ## Troubleshooting
@@ -781,6 +652,12 @@ def my_command(ctx):
     config = ctx.obj["config"]  # Access context
 ```
 
+### Validation not working?
+
+1. Make sure both `get_validation_config()` and `validate_command()` are implemented
+2. Check that command name matches exactly (case-sensitive)
+3. For subcommands, use dot notation: `"config.set"`
+
 ## Contributing
 
 Contributions are welcome! Please follow these guidelines:
@@ -790,7 +667,7 @@ Contributions are welcome! Please follow these guidelines:
 3. **Document for beginners** - Assume users have basic Python knowledge
 4. **Run tests** before submitting:
    ```bash
-   PYTHONPATH=. python -m pytest tests/unit/ -v
+   python -m pytest -xvs
    ```
 
 ### Development Setup
@@ -804,14 +681,17 @@ pip install -e .
 ### Running Tests
 
 ```bash
-# All tests
-PYTHONPATH=. python -m pytest tests/unit/ -v
+# All tests (unit + integration)
+python -m pytest -xvs
 
-# Specific test file
-PYTHONPATH=. python -m pytest tests/unit/test_completion.py -v
+# Unit tests only
+python -m pytest tests/unit/ -xvs
+
+# Integration tests only
+python -m pytest tests/integration/ -xvs
 
 # With coverage
-PYTHONPATH=. python -m pytest tests/unit/ --cov=cli_repl_kit
+python -m pytest --cov=cli_repl_kit
 ```
 
 ## License

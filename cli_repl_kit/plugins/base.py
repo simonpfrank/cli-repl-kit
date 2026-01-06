@@ -1,7 +1,8 @@
 """Base class for REPL command plugins."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Dict, Any, Optional, Literal, List
+from typing import Any, Callable, Dict, List, Literal, Optional
+
 import click
 
 

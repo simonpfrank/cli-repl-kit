@@ -2,9 +2,10 @@
 Custom auto-completion for REPL (Claude Code style).
 """
 
-from prompt_toolkit.completion import Completer, Completion, CompleteEvent
+from typing import Any, Dict, Iterable, Optional
+
+from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
-from typing import Iterable, Optional, Any, Dict
 
 
 class SlashCommandCompleter(Completer):

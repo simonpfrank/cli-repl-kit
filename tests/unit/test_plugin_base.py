@@ -1,7 +1,8 @@
 """Unit tests for the CommandPlugin base class."""
-import pytest
-import click
 from abc import ABC
+
+import click
+import pytest
 
 
 def test_cannot_instantiate_command_plugin_directly():
@@ -65,8 +66,9 @@ def test_complete_subclass_can_be_instantiated():
 
 def test_register_method_signature():
     """Test that register() method has correct signature."""
-    from cli_repl_kit.plugins.base import CommandPlugin
     import inspect
+
+    from cli_repl_kit.plugins.base import CommandPlugin
 
     class TestPlugin(CommandPlugin):
         @property

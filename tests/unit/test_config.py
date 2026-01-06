@@ -1,9 +1,9 @@
 """Unit tests for Config class."""
 
+
 import pytest
-from pathlib import Path
-import tempfile
 import yaml
+
 from cli_repl_kit.core.config import Config
 
 

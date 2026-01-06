@@ -1,9 +1,7 @@
 """Unit tests for slash command completion."""
-import pytest
 import click
-from unittest.mock import Mock
-from prompt_toolkit.document import Document
 from prompt_toolkit.completion import CompleteEvent
+from prompt_toolkit.document import Document
 
 from cli_repl_kit.core.completion import SlashCommandCompleter
 

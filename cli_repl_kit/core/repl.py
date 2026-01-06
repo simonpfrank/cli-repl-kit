@@ -1,25 +1,26 @@
 """Core REPL class with plugin discovery."""
 
-from importlib.metadata import entry_points
-from typing import Callable, Dict, Any, Optional, Tuple, List
-from pathlib import Path
-import sys
 import io
+import sys
+from contextlib import redirect_stderr, redirect_stdout
+from importlib.metadata import entry_points
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
 import click
-from cli_repl_kit.plugins.base import ValidationResult
-from prompt_toolkit.history import FileHistory
-from prompt_toolkit.layout import Layout, HSplit, Window, ScrollOffsets
-from prompt_toolkit.layout.controls import FormattedTextControl, BufferControl
-from prompt_toolkit.layout.dimension import Dimension as D
-from prompt_toolkit.layout.margins import ScrollbarMargin, Margin
-from prompt_toolkit.layout.screen import WritePosition
 from prompt_toolkit.application import Application
-from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import ANSI
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.layout import HSplit, Layout, Window
+from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+from prompt_toolkit.layout.dimension import Dimension as D
+from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 from prompt_toolkit.lexers import Lexer
-from contextlib import redirect_stdout, redirect_stderr
+
+from cli_repl_kit.plugins.base import ValidationResult
 
 
 def formatted_to_ansi(formatted_text, config):
@@ -216,8 +217,8 @@ class REPL:
         self._register_builtin_commands()
 
         # Load config
-        from cli_repl_kit.core.config import Config
         import cli_repl_kit
+        from cli_repl_kit.core.config import Config
         if config_path:
             self.config = Config.load(config_path, app_name=app_name)
         else:
@@ -727,8 +728,8 @@ class REPL:
                         return  # Exit early since we modified the buffer
 
             if text.startswith("/"):
-                from prompt_toolkit.document import Document
                 from prompt_toolkit.completion import CompleteEvent
+                from prompt_toolkit.document import Document
 
                 doc = Document(text, len(text))
                 completions = list(completer.get_completions(doc, CompleteEvent()))
@@ -839,7 +840,6 @@ class REPL:
         # Dynamic menu height - shows preferred height when slash command active,
         # otherwise minimal height to save space
         menu_preferred_height = self.config.windows.menu.height
-        info_height = self.config.windows.info.height
 
         def get_menu_height():
             """Calculate menu height dynamically.
@@ -957,18 +957,18 @@ class REPL:
         # by the windows with mouse_support=True
 
         # Page Up/Down for output scrolling
-        PAGE_SCROLL_LINES = 10  # Number of lines to scroll per page
+        page_scroll_lines = 10  # Number of lines to scroll per page
 
         @kb.add("pageup")
         def scroll_output_up(event):
             """Scroll output buffer up by one page."""
-            output_buffer.cursor_up(count=PAGE_SCROLL_LINES)
+            output_buffer.cursor_up(count=page_scroll_lines)
             event.app.invalidate()
 
         @kb.add("pagedown")
         def scroll_output_down(event):
             """Scroll output buffer down by one page."""
-            output_buffer.cursor_down(count=PAGE_SCROLL_LINES)
+            output_buffer.cursor_down(count=page_scroll_lines)
             event.app.invalidate()
 
         @kb.add("tab")
@@ -1275,7 +1275,9 @@ class REPL:
         """
         # Fallback to direct append if no callback provided
         if add_output_line is None:
-            add_output_line = lambda line: state["output_lines"].append(line)
+
+            def add_output_line(line):
+                state["output_lines"].append(line)
 
         stdout_buf = io.StringIO()
         stderr_buf = io.StringIO()

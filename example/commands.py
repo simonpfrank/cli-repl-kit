@@ -1,5 +1,8 @@
 """Commands for Hello World demo app."""
+import subprocess
+
 import click
+
 from cli_repl_kit import CommandPlugin, ValidationResult
 
 
@@ -26,6 +29,25 @@ class HelloCommandsPlugin(CommandPlugin):
             message = " ".join(text)
             print(f"hello - {message}")
 
+        @click.command()
+        @click.argument("path", default=".")
+        def list_files(path):
+            """List files in the specified directory (default: current directory)."""
+            try:
+                # Run ls command and capture output
+                result = subprocess.run(
+                    ["ls", "-la", path],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                # Print the output - this will be captured by the REPL
+                print(result.stdout)
+            except subprocess.CalledProcessError as e:
+                print(f"Error listing files: {e.stderr}")
+            except FileNotFoundError:
+                print("Error: 'ls' command not found")
+
         @click.group()
         def sub():
             """Colored text subcommands."""
@@ -48,6 +70,7 @@ class HelloCommandsPlugin(CommandPlugin):
         # Register commands
         cli.add_command(quit, name="quit")
         cli.add_command(hello, name="hello")
+        cli.add_command(list_files, name="list_files")
         cli.add_command(sub, name="sub")
 
     def get_validation_config(self):

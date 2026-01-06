@@ -1,8 +1,8 @@
 """Configuration loader for CLI REPL Kit."""
 
-import re
 from pathlib import Path
 from typing import Any, Dict, Optional
+
 import yaml
 
 

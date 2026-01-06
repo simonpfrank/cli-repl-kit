@@ -1,7 +1,8 @@
 """Unit tests for custom layout (Phase 1 & 2)."""
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
 from click import Group
+
 from cli_repl_kit.core.repl import REPL
 
 
@@ -180,9 +181,9 @@ class TestPhaseC1BugFixes:
 
     def test_dimension_callable_for_height(self):
         """Test that prompt_toolkit accepts callable for height."""
-        from prompt_toolkit.layout.dimension import Dimension as D
         from prompt_toolkit.layout import Window
         from prompt_toolkit.layout.controls import FormattedTextControl
+        from prompt_toolkit.layout.dimension import Dimension as D
 
         def dynamic_height():
             return D(preferred=5)
@@ -282,8 +283,8 @@ class TestPhaseD1FormattedToANSI:
 
     def test_formatted_to_ansi_empty_list(self):
         """Test formatted_to_ansi with empty list."""
-        from cli_repl_kit.core.repl import formatted_to_ansi
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import formatted_to_ansi
 
         config = Config.get_defaults()
         result = formatted_to_ansi([], config)
@@ -291,8 +292,8 @@ class TestPhaseD1FormattedToANSI:
 
     def test_formatted_to_ansi_plain_text(self):
         """Test formatted_to_ansi with plain text (no style)."""
-        from cli_repl_kit.core.repl import formatted_to_ansi
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import formatted_to_ansi
 
         config = Config.get_defaults()
         formatted = [("", "Hello World")]
@@ -301,8 +302,8 @@ class TestPhaseD1FormattedToANSI:
 
     def test_formatted_to_ansi_single_color(self):
         """Test formatted_to_ansi with single color."""
-        from cli_repl_kit.core.repl import formatted_to_ansi
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import formatted_to_ansi
 
         config = Config.get_defaults()
         formatted = [("red", "Error message")]
@@ -311,8 +312,8 @@ class TestPhaseD1FormattedToANSI:
 
     def test_formatted_to_ansi_bold_style(self):
         """Test formatted_to_ansi with bold style."""
-        from cli_repl_kit.core.repl import formatted_to_ansi
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import formatted_to_ansi
 
         config = Config.get_defaults()
         formatted = [("bold", "Bold text")]
@@ -321,8 +322,8 @@ class TestPhaseD1FormattedToANSI:
 
     def test_formatted_to_ansi_combined_style(self):
         """Test formatted_to_ansi with combined style."""
-        from cli_repl_kit.core.repl import formatted_to_ansi
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import formatted_to_ansi
 
         config = Config.get_defaults()
         formatted = [("cyan bold", "Cyan bold text")]
@@ -333,8 +334,8 @@ class TestPhaseD1FormattedToANSI:
 
     def test_formatted_to_ansi_multiple_fragments(self):
         """Test formatted_to_ansi with multiple fragments."""
-        from cli_repl_kit.core.repl import formatted_to_ansi
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import formatted_to_ansi
 
         config = Config.get_defaults()
         formatted = [
@@ -349,8 +350,8 @@ class TestPhaseD1FormattedToANSI:
 
     def test_formatted_to_ansi_unknown_style(self):
         """Test formatted_to_ansi with unknown style (should output plain text)."""
-        from cli_repl_kit.core.repl import formatted_to_ansi
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import formatted_to_ansi
 
         config = Config.get_defaults()
         formatted = [("unknown_style", "Text")]
@@ -364,8 +365,9 @@ class TestPhaseD2ANSILexer:
 
     def test_ansi_lexer_plain_text(self):
         """Test ANSILexer with plain text (no ANSI codes)."""
-        from cli_repl_kit.core.repl import ANSILexer
         from prompt_toolkit.document import Document
+
+        from cli_repl_kit.core.repl import ANSILexer
 
         lexer = ANSILexer()
         doc = Document("Hello World")
@@ -380,8 +382,9 @@ class TestPhaseD2ANSILexer:
 
     def test_ansi_lexer_with_ansi_codes(self):
         """Test ANSILexer with ANSI color codes."""
-        from cli_repl_kit.core.repl import ANSILexer
         from prompt_toolkit.document import Document
+
+        from cli_repl_kit.core.repl import ANSILexer
 
         lexer = ANSILexer()
         # Text with ANSI red color
@@ -395,8 +398,9 @@ class TestPhaseD2ANSILexer:
 
     def test_ansi_lexer_multiline(self):
         """Test ANSILexer with multiple lines."""
-        from cli_repl_kit.core.repl import ANSILexer
         from prompt_toolkit.document import Document
+
+        from cli_repl_kit.core.repl import ANSILexer
 
         lexer = ANSILexer()
         doc = Document("Line 1\nLine 2\nLine 3")
@@ -413,8 +417,9 @@ class TestPhaseD2ANSILexer:
 
     def test_ansi_lexer_empty_line(self):
         """Test ANSILexer with empty line."""
-        from cli_repl_kit.core.repl import ANSILexer
         from prompt_toolkit.document import Document
+
+        from cli_repl_kit.core.repl import ANSILexer
 
         lexer = ANSILexer()
         doc = Document("")
@@ -429,8 +434,8 @@ class TestPhaseD3OutputCapture:
 
     def test_output_capture_initialization(self):
         """Test OutputCapture initializes correctly."""
-        from cli_repl_kit.core.repl import OutputCapture
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import OutputCapture
 
         config = Config.get_defaults()
         captured = []
@@ -443,8 +448,8 @@ class TestPhaseD3OutputCapture:
 
     def test_output_capture_stdout_write(self):
         """Test OutputCapture captures stdout writes."""
-        from cli_repl_kit.core.repl import OutputCapture
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import OutputCapture
 
         config = Config.get_defaults()
         captured = []
@@ -460,8 +465,8 @@ class TestPhaseD3OutputCapture:
 
     def test_output_capture_stderr_write(self):
         """Test OutputCapture captures stderr writes with red styling."""
-        from cli_repl_kit.core.repl import OutputCapture
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import OutputCapture
 
         config = Config.get_defaults()
         captured = []
@@ -477,8 +482,8 @@ class TestPhaseD3OutputCapture:
 
     def test_output_capture_ignores_empty_writes(self):
         """Test OutputCapture ignores empty or newline-only writes."""
-        from cli_repl_kit.core.repl import OutputCapture
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import OutputCapture
 
         config = Config.get_defaults()
         captured = []
@@ -495,8 +500,8 @@ class TestPhaseD3OutputCapture:
 
     def test_output_capture_flush(self):
         """Test OutputCapture flush method (no-op)."""
-        from cli_repl_kit.core.repl import OutputCapture
         from cli_repl_kit.core.config import Config
+        from cli_repl_kit.core.repl import OutputCapture
 
         config = Config.get_defaults()
 

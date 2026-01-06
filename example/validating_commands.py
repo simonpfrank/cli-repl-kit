@@ -6,8 +6,9 @@ This plugin showcases the three validation levels:
 - None: No validation (greet)
 """
 
-from cli_repl_kit import CommandPlugin, ValidationResult
 import click
+
+from cli_repl_kit import CommandPlugin, ValidationResult
 
 
 class ValidatingCommandsPlugin(CommandPlugin):

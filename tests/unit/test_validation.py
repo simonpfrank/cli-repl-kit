@@ -1,7 +1,6 @@
 """Unit tests for validation system."""
 
-import pytest
-from cli_repl_kit.plugins.base import ValidationResult, CommandPlugin
+from cli_repl_kit.plugins.base import CommandPlugin, ValidationResult
 
 
 class TestValidationResult:
