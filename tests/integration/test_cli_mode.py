@@ -1,4 +1,5 @@
 """Integration tests for CLI mode (non-REPL) command execution."""
+
 import subprocess
 import sys
 
@@ -9,7 +10,7 @@ def test_hello_command_cli_mode():
         [sys.executable, "-m", "example.cli", "hello", "World"],
         capture_output=True,
         text=True,
-        timeout=5
+        timeout=5,
     )
 
     assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
@@ -22,7 +23,7 @@ def test_hello_command_with_multiple_args():
         [sys.executable, "-m", "example.cli", "hello", "Hello", "from", "CLI"],
         capture_output=True,
         text=True,
-        timeout=5
+        timeout=5,
     )
 
     assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
@@ -35,7 +36,7 @@ def test_sub_red_command_cli_mode():
         [sys.executable, "-m", "example.cli", "sub", "red", "This", "is", "red"],
         capture_output=True,
         text=True,
-        timeout=5
+        timeout=5,
     )
 
     assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
@@ -48,7 +49,7 @@ def test_sub_blue_command_cli_mode():
         [sys.executable, "-m", "example.cli", "sub", "blue", "Blue", "text"],
         capture_output=True,
         text=True,
-        timeout=5
+        timeout=5,
     )
 
     assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
@@ -61,7 +62,7 @@ def test_list_files_command_cli_mode():
         [sys.executable, "-m", "example.cli", "list_files"],
         capture_output=True,
         text=True,
-        timeout=5
+        timeout=5,
     )
 
     assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
@@ -75,7 +76,7 @@ def test_list_files_with_path_cli_mode():
         [sys.executable, "-m", "example.cli", "list_files", "example"],
         capture_output=True,
         text=True,
-        timeout=5
+        timeout=5,
     )
 
     assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
@@ -89,7 +90,7 @@ def test_unknown_command_cli_mode():
         [sys.executable, "-m", "example.cli", "unknown_command"],
         capture_output=True,
         text=True,
-        timeout=5
+        timeout=5,
     )
 
     # Unknown command should exit with non-zero code
@@ -103,7 +104,7 @@ def test_help_command_cli_mode():
         [sys.executable, "-m", "example.cli", "--help"],
         capture_output=True,
         text=True,
-        timeout=5
+        timeout=5,
     )
 
     assert result.returncode == 0
@@ -119,7 +120,7 @@ def test_subcommand_help_cli_mode():
         [sys.executable, "-m", "example.cli", "sub", "--help"],
         capture_output=True,
         text=True,
-        timeout=5
+        timeout=5,
     )
 
     assert result.returncode == 0

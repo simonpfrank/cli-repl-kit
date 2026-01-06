@@ -30,13 +30,16 @@ class HelloCommandsPlugin(CommandPlugin):
             print(f"hello - {message}")
 
         @click.command()
-        @click.argument("path", default=".")
+        @click.argument("path", nargs=-1)
         def list_files(path):
             """List files in the specified directory (default: current directory)."""
+            # Use current directory if no path provided
+            target_path = " ".join(path) if path else "."
+
             try:
                 # Run ls command and capture output
                 result = subprocess.run(
-                    ["ls", "-la", path],
+                    ["ls", "-la", target_path],
                     capture_output=True,
                     text=True,
                     check=True

@@ -682,8 +682,30 @@ class REPL:
             text = input_buffer.text
             is_top_level = " " not in text.rstrip()
 
+            # Calculate visible window of completions based on menu height
+            menu_height = self.config.windows.menu.height
+            total_completions = len(state["completions"])
+            selected_idx = state["selected_idx"]
+
+            # Calculate the window of completions to show
+            if total_completions <= menu_height:
+                # Show all if they fit
+                start_idx = 0
+                end_idx = total_completions
+            else:
+                # Show a window centered around the selected item
+                # Try to keep selected item in the middle
+                half_window = menu_height // 2
+                start_idx = max(0, selected_idx - half_window)
+                end_idx = min(total_completions, start_idx + menu_height)
+
+                # Adjust if we hit the end
+                if end_idx == total_completions:
+                    start_idx = max(0, end_idx - menu_height)
+
             lines = []
-            for i, comp in enumerate(state["completions"]):
+            for i in range(start_idx, end_idx):
+                comp = state["completions"][i]
                 cmd_text = str(comp.text)
                 help_text = comp.display_meta if hasattr(comp, "display_meta") else ""
                 if isinstance(help_text, list):
@@ -698,7 +720,7 @@ class REPL:
                 grey_color = self.config.colors.grey
                 style = f"{highlight_color} bold" if i == state["selected_idx"] else grey_color
                 lines.append((style, formatted))
-                if i < len(state["completions"]) - 1:
+                if i < end_idx - 1:
                     lines.append(("", "\n"))
             return lines
 
@@ -1318,13 +1340,42 @@ class REPL:
 
     # API methods for status and info lines
 
+    def _substitute_ansi_codes(self, text: str) -> str:
+        """Substitute ${ansi.COLOR} patterns with ANSI escape codes from config.
+
+        Args:
+            text: Text containing ${ansi.COLOR} patterns
+
+        Returns:
+            Text with ANSI codes substituted
+
+        Example:
+            "${ansi.red}Error${ansi.reset}" -> "\x1b[31mError\x1b[0m"
+        """
+        import re
+
+        # Find all ${ansi.XXX} patterns
+        pattern = r'\$\{ansi\.([^}]+)\}'
+
+        def replace_ansi(match):
+            color_name = match.group(1)
+            return self.config.ansi_colors.get(color_name, match.group(0))
+
+        return re.sub(pattern, replace_ansi, text)
+
     def set_status(self, text: str, style: str = ""):
         """Update status line content.
 
         Args:
-            text: Text to display
+            text: Text to display (supports ${ansi.COLOR} substitution)
             style: Optional style (e.g., "yellow", "green bold")
+
+        Example:
+            set_status("${ansi.red}Error occurred${ansi.reset}")
         """
+        # Substitute ANSI color codes
+        text = self._substitute_ansi_codes(text)
+
         if hasattr(self, "_current_state"):
             if style:
                 self._current_state["status_text"] = [(style, text)]
@@ -1344,9 +1395,15 @@ class REPL:
         """Update info line content.
 
         Args:
-            text: Text to display
+            text: Text to display (supports ${ansi.COLOR} substitution)
             style: Optional style (e.g., "cyan", "bold")
+
+        Example:
+            set_info("${ansi.cyan}Tip: ${ansi.reset}Try /help")
         """
+        # Substitute ANSI color codes
+        text = self._substitute_ansi_codes(text)
+
         if hasattr(self, "_current_state"):
             if style:
                 self._current_state["info_text"] = [(style, text)]

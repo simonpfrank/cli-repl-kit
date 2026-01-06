@@ -166,7 +166,7 @@ class Config:
         },
         "history": {
             "enabled": True,
-            "file_location": "history",
+            "file_location": "~/.config/cli-repl-kit/${APP_NAME}_history",
         },
         "mouse": {
             "enabled": True,
