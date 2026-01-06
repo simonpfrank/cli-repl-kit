@@ -239,6 +239,280 @@ def show_config(ctx):
     print(config)
 ```
 
+## Using Multiple Plugins
+
+### Can Multiple Plugins Work Together?
+
+**Yes!** cli-repl-kit is designed to support multiple plugins working together in the same application. All plugins are automatically discovered, loaded, and their commands are merged into a single CLI/REPL interface.
+
+### How Multiple Plugins Work
+
+When your app starts, the REPL:
+1. **Discovers** all plugins from the `"repl.commands"` entry point group
+2. **Instantiates** each plugin class
+3. **Registers** all commands from all plugins into the same Click CLI
+4. **Shares** the same context factory across all plugins
+
+All commands from all plugins appear together in tab completion and `/help` output.
+
+### Configuring Multiple Plugins
+
+To use multiple plugins, simply add multiple entries to the `"repl.commands"` entry point in `pyproject.toml`:
+
+```toml
+[project.entry-points."repl.commands"]
+file_commands = "my_app.plugins.files:FileCommandsPlugin"
+git_commands = "my_app.plugins.git:GitCommandsPlugin"
+config_commands = "my_app.plugins.config:ConfigCommandsPlugin"
+```
+
+**Important**: After changing entry points, you MUST reinstall your package:
+```bash
+pip install -e .
+```
+
+### Complete Example: Multi-Plugin App
+
+Here's a complete example of an app with three plugins:
+
+**Project structure:**
+```
+my-app/
+├── pyproject.toml
+├── my_app/
+│   ├── __init__.py
+│   ├── cli.py                # Entry point
+│   └── plugins/
+│       ├── __init__.py
+│       ├── files.py          # File operations plugin
+│       ├── git.py            # Git operations plugin
+│       └── system.py         # System commands plugin
+```
+
+**`pyproject.toml`:**
+```toml
+[project]
+name = "my-app"
+version = "0.1.0"
+dependencies = ["cli-repl-kit"]
+
+[project.scripts]
+my-app = "my_app.cli:main"
+
+[project.entry-points."repl.commands"]
+files = "my_app.plugins.files:FileCommandsPlugin"
+git = "my_app.plugins.git:GitCommandsPlugin"
+system = "my_app.plugins.system:SystemCommandsPlugin"
+```
+
+**`my_app/plugins/files.py`:**
+```python
+import click
+from cli_repl_kit import CommandPlugin
+
+class FileCommandsPlugin(CommandPlugin):
+    @property
+    def name(self):
+        return "files"
+
+    def register(self, cli, context_factory):
+        @click.command()
+        @click.argument("path")
+        def copy(path):
+            """Copy a file."""
+            print(f"Copying {path}...")
+
+        @click.command()
+        @click.argument("path")
+        def delete(path):
+            """Delete a file."""
+            print(f"Deleting {path}...")
+
+        cli.add_command(copy, name="copy")
+        cli.add_command(delete, name="delete")
+```
+
+**`my_app/plugins/git.py`:**
+```python
+import click
+from cli_repl_kit import CommandPlugin
+
+class GitCommandsPlugin(CommandPlugin):
+    @property
+    def name(self):
+        return "git"
+
+    def register(self, cli, context_factory):
+        @click.group()
+        def git():
+            """Git operations."""
+            pass
+
+        @git.command()
+        def status():
+            """Show git status."""
+            print("Git status...")
+
+        @git.command()
+        @click.argument("message")
+        def commit(message):
+            """Commit changes."""
+            print(f"Committing: {message}")
+
+        cli.add_command(git, name="git")
+```
+
+**`my_app/plugins/system.py`:**
+```python
+import click
+from cli_repl_kit import CommandPlugin
+
+class SystemCommandsPlugin(CommandPlugin):
+    @property
+    def name(self):
+        return "system"
+
+    def register(self, cli, context_factory):
+        @click.command()
+        def quit():
+            """Exit the application."""
+            print("Goodbye!")
+            raise SystemExit(0)
+
+        @click.command()
+        def version():
+            """Show version."""
+            print("My App v0.1.0")
+
+        cli.add_command(quit, name="quit")
+        cli.add_command(version, name="version")
+```
+
+**`my_app/cli.py`:**
+```python
+import sys
+from cli_repl_kit import REPL
+
+def main():
+    """Start the app."""
+    repl = REPL(app_name="My App")
+
+    if len(sys.argv) > 1:
+        repl.cli(sys.argv[1:], standalone_mode=False)
+    else:
+        repl.start()
+
+if __name__ == "__main__":
+    main()
+```
+
+**Using the multi-plugin app:**
+```
+$ my-app
+My App
+Type /help for commands, /quit to exit
+
+> /<TAB>
+/copy      Copy a file
+/delete    Delete a file
+/git       Git operations
+/quit      Exit the application
+/version   Show version
+/help      Show available commands
+
+> /copy file.txt
+■ /copy
+  ⎿ file.txt
+Copying file.txt...
+
+> /git status
+■ /git → status
+Git status...
+
+> /version
+● /version
+My App v0.1.0
+
+> /quit
+● /quit
+Goodbye!
+```
+
+### Sharing Context Between Plugins
+
+All plugins receive the same `context_factory` function, so they can access shared data:
+
+```python
+# In cli.py
+def my_context():
+    return {
+        "config": load_config(),
+        "db": connect_database(),
+        "session": create_session()
+    }
+
+repl = REPL(app_name="My App", context_factory=my_context)
+```
+
+```python
+# In ANY plugin
+@click.command()
+@click.pass_context
+def some_command(ctx):
+    """Access shared context."""
+    config = ctx.obj["config"]      # Same config object
+    db = ctx.obj["db"]              # Same database connection
+    session = ctx.obj["session"]    # Same session object
+```
+
+### Command Name Collisions
+
+**What happens if two plugins try to register the same command name?**
+
+Click will raise an error during registration, and your app won't start. You'll see:
+```
+UsageError: The command 'status' already exists.
+```
+
+**How to avoid collisions:**
+
+1. **Use unique command names** - Prefix with plugin name:
+   ```python
+   cli.add_command(show_status, name="git_status")  # Instead of "status"
+   cli.add_command(show_info, name="file_info")     # Instead of "info"
+   ```
+
+2. **Use subcommand groups** (recommended):
+   ```python
+   # Instead of top-level "status" command from multiple plugins
+   # Use groups: /git status, /network status, /system status
+   @click.group()
+   def git():
+       pass
+
+   @git.command()
+   def status():
+       pass
+
+   cli.add_command(git, name="git")
+   ```
+
+### When to Use Multiple Plugins vs. One Plugin
+
+**Use multiple plugins when:**
+- Commands naturally group into separate concerns (files, git, network, etc.)
+- Different team members own different command sets
+- You want to enable/disable command groups independently
+- Commands have different dependencies (one plugin needs database, another doesn't)
+
+**Use a single plugin when:**
+- All commands are closely related
+- Your app is small (< 10 commands)
+- Commands share significant implementation code
+- You want simpler project structure
+
+**Example**: The demo app uses **one plugin** because all commands are simple examples for the same purpose. A production app with file operations, git integration, and system monitoring would use **three plugins**.
+
 ## Key Features
 
 ### Tab Completion
