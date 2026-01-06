@@ -163,7 +163,7 @@ My CLI App v0.1.0
 
 That's it! You now have a working CLI/REPL app with tab completion and styled output.
 
-## Core Concepts (Explained Simply)
+## Core Concepts
 
 ### 1. CommandPlugin
 
@@ -576,7 +576,7 @@ The built-in `/status` and `/info` commands support ANSI escape codes from the c
 
 ### Automatic Validation
 
-**NEW!** Validation is now completely automatic based on Click decorators. No manual validation methods needed!
+Validation is now completely automatic based on Click decorators. No manual validation methods needed!
 
 #### How It Works
 
@@ -664,11 +664,9 @@ Validation level is automatically determined:
 - **Optional** - Commands with optional arguments (have defaults)
 - **None** - Commands with no parameters
 
-No manual `get_validation_config()` or `validate_command()` methods needed!
-
 ### Mouse Selection in Output Area
 
-**NEW!** You can now select and copy text from the output area using your mouse.
+You can now select and copy text from the output area using your mouse.
 
 #### How to Use
 
@@ -840,8 +838,8 @@ class StyledCommandsPlugin(CommandPlugin):
 
 > /table
 ● /table
-╭─────────────────────────────────╮
-│         User Data               │
+╭────────────────────────────────╮
+│         User Data              │
 ├─────────┬──────────┬───────────┤
 │ Name    │ Status   │ Score     │
 ├─────────┼──────────┼───────────┤
