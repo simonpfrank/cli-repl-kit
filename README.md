@@ -262,6 +262,43 @@ save  Save configuration
 
 **No configuration needed** - works automatically for all Click commands!
 
+### Status and Info Line Formatting
+
+The built-in `/status` and `/info` commands support ANSI escape codes from the config for colored text:
+
+**Using ANSI colors from config:**
+```bash
+# In REPL mode
+> /status ${ansi.red}Error occurred${ansi.reset}
+> /info ${ansi.cyan}Tip: ${ansi.reset}Use /help for commands
+
+# The ${ansi.COLOR} patterns are replaced with actual ANSI codes
+```
+
+**Available ANSI codes** (from `config.ansi_colors`):
+
+**Text styles:**
+- `${ansi.bold}` - Bold text
+- `${ansi.dim}` - Dim text
+- `${ansi.italic}` - Italic text
+- `${ansi.underline}` - Underlined text
+
+**Foreground colors:**
+- `${ansi.black}`, `${ansi.red}`, `${ansi.green}`, `${ansi.yellow}`
+- `${ansi.blue}`, `${ansi.magenta}`, `${ansi.cyan}`, `${ansi.white}`
+
+**Special:**
+- `${ansi.reset}` - Reset all formatting (important!)
+
+**Example usage:**
+```bash
+> /status ${ansi.yellow}Processing...${ansi.reset}
+> /status ${ansi.green}${ansi.bold}Success!${ansi.reset}
+> /info ${ansi.dim}Press Ctrl+C to cancel${ansi.reset}
+```
+
+**Note:** For command output (print statements), use the Rich Console as shown in the "Styling Command Output" section below.
+
 ### Command Validation
 
 Validate command arguments before execution with three flexible levels:
