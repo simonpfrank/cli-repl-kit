@@ -257,3 +257,44 @@ class TestDefaultConfig:
 
         assert config.prompt.character == "> "
         assert config.prompt.continuation == "  "
+
+    def test_default_symbols(self):
+        """Test default symbol values for command output formatting."""
+        config = Config.get_defaults()
+
+        # Command output formatting symbols
+        assert config.symbols.command_success == "●"
+        assert config.symbols.command_error == "●"
+        assert config.symbols.command_with_args == "■"
+        assert config.symbols.indent == "⎿"
+        assert config.symbols.arrow == "→"
+
+        # Status indicator symbols
+        assert config.symbols.success == "✓"
+        assert config.symbols.error == "✗"
+        assert config.symbols.warning == "⚠"
+        assert config.symbols.info == "ℹ"
+        assert config.symbols.bullet == "•"
+
+    def test_default_status_line(self):
+        """Test default status line spinner and styling configuration."""
+        config = Config.get_defaults()
+
+        # Spinner frames
+        assert len(config.status_line.spinner_frames) == 10
+        assert config.status_line.spinner_frames[0] == "⠋"
+        assert config.status_line.spinner_frames[-1] == "⠏"
+
+        # Spinner timing
+        assert config.status_line.spinner_interval == 100
+
+        # Status styling
+        assert config.status_line.processing_color == "yellow"
+        assert config.status_line.processing_style == "bold"
+
+    def test_default_ascii_art(self):
+        """Test default ASCII art banner text configuration."""
+        config = Config.get_defaults()
+
+        assert config.appearance.ascii_art_text == "CLI REPL Kit"
+        assert config.appearance.box_width == 140

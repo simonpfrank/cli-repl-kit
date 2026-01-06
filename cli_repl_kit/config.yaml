@@ -48,6 +48,29 @@ colors:
   info: "cyan"              # Info messages
   prompt: "bold"            # Prompt character style
   divider: "#808080"        # Grey divider lines
+  command_text: "dim"       # Command display in output
+
+symbols:
+  # Command output formatting
+  command_success: "●"      # Round bullet for successful commands
+  command_error: "●"        # Round bullet for failed commands
+  command_with_args: "■"    # Square for commands with arguments
+  indent: "⎿"               # Indent indicator for arguments
+  arrow: "→"                # Arrow for subcommands
+  # Status indicators
+  success: "✓"              # Success checkmark
+  error: "✗"                # Error cross
+  warning: "⚠"              # Warning triangle
+  info: "ℹ"                 # Info icon
+  bullet: "•"               # Generic bullet point
+
+status_line:
+  # Claude Code-style spinner animation frames
+  spinner_frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+  spinner_interval: 100  # Milliseconds between frames
+  # Status text styling
+  processing_color: "yellow"  # Orange/yellow for "processing" status
+  processing_style: "bold"     # Bold for emphasis
 
 ansi_colors:
   # Standard text styles
@@ -94,7 +117,7 @@ keybindings:
 
 history:
   enabled: true
-  file_location: "~/.{app_name}/history"  # {app_name} replaced at runtime
+  file_location: "history"  # {app_name} replaced at runtime
 
 mouse:
   enabled: true             # Mouse scrolling support
@@ -102,3 +125,4 @@ mouse:
 appearance:
   box_width: 140            # Width of intro banner box
   full_screen: true         # Full screen mode
+  ascii_art_text: "Hello World"  # Text displayed in intro banner (override default)

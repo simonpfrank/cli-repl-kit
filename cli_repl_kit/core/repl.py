@@ -321,16 +321,36 @@ class REPL:
             history_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Box width (inner content area)
-        box_width = 140
+        box_width = self.config.appearance.box_width
 
-        # ASCII art for app name
-        ascii_art = [
-            "  _   _      _ _        __        __         _     _ ",
-            " | | | | ___| | | ___   \\ \\      / /__  _ __| | __| |",
-            " | |_| |/ _ \\ | |/ _ \\   \\ \\ /\\ / / _ \\| '__| |/ _` |",
-            " |  _  |  __/ | | (_) |   \\ V  V / (_) | |  | | (_| |",
-            " |_| |_|\\___|_|_|\\___/     \\_/\\_/ \\___/|_|  |_|\\__,_|",
-        ]
+        # Get banner text from config (allows customization)
+        banner_text = self.config.appearance.ascii_art_text
+
+        # ASCII art mappings for common text values
+        # This allows nice ASCII art for known values, plain text for others
+        ascii_art_map = {
+            "Hello World": [
+                "  _   _      _ _        __        __         _     _ ",
+                " | | | | ___| | | ___   \\ \\      / /__  _ __| | __| |",
+                " | |_| |/ _ \\ | |/ _ \\   \\ \\ /\\ / / _ \\| '__| |/ _` |",
+                " |  _  |  __/ | | (_) |   \\ V  V / (_) | |  | | (_| |",
+                " |_| |_|\\___|_|_|\\___/     \\_/\\_/ \\___/|_|  |_|\\__,_|",
+            ],
+            "CLI REPL Kit": [
+                "   ____ _     ___   ____  _____ ____  _       _  ___ _   ",
+                "  / ___| |   |_ _| |  _ \\| ____|  _ \\| |     | |/ (_) |_ ",
+                " | |   | |    | |  | |_) |  _| | |_) | |     | ' /| | __|",
+                " | |___| |___ | |  |  _ <| |___|  __/| |___  | . \\| | |_ ",
+                "  \\____|_____|___| |_| \\_\\_____|_|   |_____| |_|\\_\\_|\\__|",
+            ],
+        }
+
+        # Use ASCII art if available, otherwise just use the text centered
+        if banner_text in ascii_art_map:
+            ascii_art = ascii_art_map[banner_text]
+        else:
+            # Plain text fallback - center the text
+            ascii_art = [banner_text]
 
         # Create intro banner
         intro_lines = [
@@ -495,6 +515,75 @@ class REPL:
                 cursor_position=len(new_text)
             )
 
+        def format_command_display(command_text, has_error=False):
+            """Format command for display with icons and proper styling.
+
+            Args:
+                command_text: The full command text (with or without /)
+                has_error: Whether the command resulted in an error
+
+            Returns:
+                List of lines to display (each line is FormattedText)
+            """
+            # Remove leading / if present
+            if command_text.startswith("/"):
+                command_text = command_text[1:]
+
+            # Parse command and arguments
+            parts = command_text.split(maxsplit=1)
+            if not parts:
+                return []
+
+            cmd_name = parts[0]
+            has_args = len(parts) > 1
+            args_text = parts[1] if has_args else ""
+
+            # Choose icon based on command structure
+            if has_args:
+                icon = self.config.symbols.command_with_args  # ■
+            else:
+                # For simple commands, use success/error icons with color
+                if has_error:
+                    icon = self.config.symbols.command_error  # ●
+                    icon_color = self.config.colors.error  # red
+                else:
+                    icon = self.config.symbols.command_success  # ●
+                    icon_color = self.config.colors.success  # green
+
+            # For commands with args, icon is always grey (success/error shown in output)
+            if has_args:
+                icon_color = self.config.colors.grey
+
+            # Build command display line
+            cmd_display = [
+                (icon_color, icon + " "),
+                (self.config.colors.grey, "/" + cmd_name)
+            ]
+
+            # If no args, return single line
+            if not has_args:
+                return [cmd_display]
+
+            # If has args, add them on next line(s) with indent
+            lines = [cmd_display]
+
+            # Check if args have sub-commands (e.g., "group → subcommand")
+            # For now, just display args with indent symbol
+            indent_symbol = self.config.symbols.indent  # ⎿
+            indent_prefix = [(self.config.colors.grey, indent_symbol + " ")]
+
+            # Handle multi-line args
+            arg_lines = args_text.split("\n")
+            for i, arg_line in enumerate(arg_lines):
+                if i == 0:
+                    # First line with indent symbol
+                    lines.append(indent_prefix + [("", arg_line)])
+                else:
+                    # Continuation lines indented by 2 spaces
+                    lines.append([("", "  " + arg_line)])
+
+            return lines
+
         # Render status line
         def render_status():
             """Render status line content."""
@@ -629,12 +718,12 @@ class REPL:
             text = input_buffer.text
             if not text:
                 # Empty buffer - use initial height from config
-                return D(preferred=self.config.windows.input.initial_height, min=1)
+                return D(preferred=self.config.windows.input.initial_height)
             else:
                 # Calculate based on actual content
                 line_count = max(1, text.count('\n') + 1)
                 # No max limit - input can grow endlessly within terminal limits
-                return D(preferred=line_count, min=1)
+                return D(preferred=line_count)
 
         input_window = Window(
             content=BufferControl(
@@ -646,6 +735,7 @@ class REPL:
             height=get_input_height,  # Dynamic height: 1 line when empty, grows endlessly
             wrap_lines=True,
             get_line_prefix=get_input_prompt,  # Add > prompt
+            dont_extend_height=True,  # Don't extend beyond calculated height
             # NO scrollbar - input grows endlessly, no internal scrolling
             # NO scroll_offsets - was causing 4-line initial height bug
         )
@@ -685,8 +775,7 @@ class REPL:
             """
             if (state["slash_command_active"] and state["completions"]) or state["menu_keep_visible"]:
                 # Show full menu when slash command active OR when keeping visible after execution
-                # min=1 ensures at least 1 line visible even when space is tight
-                return D(preferred=menu_preferred_height, min=1)
+                return D(preferred=menu_preferred_height)
             else:
                 # Zero height when not active - completely hidden
                 return D(preferred=0, min=0)
@@ -928,8 +1017,11 @@ class REPL:
             if not text:
                 return
 
-            # Add command to output (with auto-scroll) - show original with blank lines
-            add_output_line([("bold", "> "), ("", original_text)])
+            # Format and display command with icons
+            formatted_lines = format_command_display(original_text, has_error=False)
+            for line in formatted_lines:
+                add_output_line(line)
+
             # Reset scroll lock on new command submission
             state["user_scrolled_output"] = False
             state["output_scroll_offset"] = 0
@@ -1005,6 +1097,9 @@ class REPL:
             else:
                 add_output_line([("red", f"Unknown command: {cmd_name}")])
 
+            # Add empty line after command output
+            add_output_line([("", "")])
+
             event.app.invalidate()
 
         # Create application
@@ -1018,6 +1113,10 @@ class REPL:
         # Store references for API methods
         self._current_app = app
         self._current_state = state
+
+        # Force immediate layout recalculation to fix input height timing issue
+        # This ensures get_input_height() is evaluated with proper application context
+        app.invalidate()
 
         # Global stdout/stderr capture
         stdout_capture = OutputCapture("stdout", add_output_line, self.config)

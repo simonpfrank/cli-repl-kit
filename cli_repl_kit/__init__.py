@@ -18,23 +18,9 @@ __version__ = "0.1.0"
 from cli_repl_kit.core.repl import REPL
 from cli_repl_kit.plugins.base import CommandPlugin
 from cli_repl_kit.core.completion import SlashCommandCompleter
-from cli_repl_kit.ui.styles import (
-    APP_THEME,
-    SYMBOLS,
-    format_success,
-    format_error,
-    format_warning,
-    format_info,
-)
 
 __all__ = [
     "REPL",
     "CommandPlugin",
     "SlashCommandCompleter",
-    "APP_THEME",
-    "SYMBOLS",
-    "format_success",
-    "format_error",
-    "format_warning",
-    "format_info",
 ]

@@ -36,7 +36,9 @@ class ConfigDict(dict):
         """
         if name in self:
             return self[name]
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{name}'"
+        )
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Allow attribute assignment to dictionary keys.
@@ -99,6 +101,29 @@ class Config:
             "info": "cyan",
             "prompt": "bold",
             "divider": "#808080",
+            "command_text": "dim",
+        },
+        "symbols": {
+            # Command output formatting
+            "command_success": "●",
+            "command_error": "●",
+            "command_with_args": "■",
+            "indent": "⎿",
+            "arrow": "→",
+            # Status indicators
+            "success": "✓",
+            "error": "✗",
+            "warning": "⚠",
+            "info": "ℹ",
+            "bullet": "•",
+        },
+        "status_line": {
+            # Claude Code-style spinner animation frames
+            "spinner_frames": ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+            "spinner_interval": 100,  # Milliseconds between frames
+            # Status text styling
+            "processing_color": "yellow",  # Orange/yellow for "processing" status
+            "processing_style": "bold",     # Bold for emphasis
         },
         "ansi_colors": {
             # Standard text styles
@@ -141,7 +166,7 @@ class Config:
         },
         "history": {
             "enabled": True,
-            "file_location": "~/.{app_name}/history",
+            "file_location": "history",
         },
         "mouse": {
             "enabled": True,
@@ -149,6 +174,7 @@ class Config:
         "appearance": {
             "box_width": 140,
             "full_screen": True,
+            "ascii_art_text": "CLI REPL Kit",  # Default banner text
         },
     }
 
@@ -248,6 +274,7 @@ class Config:
             Deep copy of dictionary
         """
         import copy
+
         return copy.deepcopy(data)
 
     @staticmethod
@@ -264,7 +291,11 @@ class Config:
         result = base.copy()
 
         for key, value in override.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
                 result[key] = Config._deep_merge(result[key], value)
             else:
                 result[key] = value
@@ -283,7 +314,10 @@ class Config:
             Data with variables substituted
         """
         if isinstance(data, dict):
-            return {key: Config._substitute_variables(value, variables) for key, value in data.items()}
+            return {
+                key: Config._substitute_variables(value, variables)
+                for key, value in data.items()
+            }
         elif isinstance(data, list):
             return [Config._substitute_variables(item, variables) for item in data]
         elif isinstance(data, str):
@@ -310,7 +344,9 @@ class Config:
                 if isinstance(window_config, dict) and "height" in window_config:
                     height = window_config["height"]
                     if height is not None and height < 0:
-                        raise ValueError(f"{window_name} height must be non-negative, got {height}")
+                        raise ValueError(
+                            f"{window_name} height must be non-negative, got {height}"
+                        )
 
         # Validate colors
         if "colors" in data:
@@ -318,8 +354,10 @@ class Config:
                 if isinstance(color_value, str):
                     # Accept hex colors (#RRGGBB), named colors, or empty
                     if color_value and not (
-                        color_value.startswith("#") or
-                        color_value.isalpha() or
-                        " " in color_value  # Allow "bold", "green bold", etc.
+                        color_value.startswith("#")
+                        or color_value.isalpha()
+                        or " " in color_value  # Allow "bold", "green bold", etc.
                     ):
-                        raise ValueError(f"Invalid color format for {color_name}: {color_value}")
+                        raise ValueError(
+                            f"Invalid color format for {color_name}: {color_value}"
+                        )
