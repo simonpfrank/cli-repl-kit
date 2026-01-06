@@ -80,7 +80,7 @@ Tracking implementation progress for Claude Code-style REPL UI using prompt-tool
 - formatted_to_ansi() maps FormattedText styles to config ANSI codes
 - Page Up/Down scroll by 10 lines (PAGE_SCROLL_LINES constant)
 
-### Phase E: Automatic Validation & Mouse Selection - ✅ COMPLETE (2026-01-06)
+### Phase E: Automatic Validation - ✅ COMPLETE (2026-01-06)
 | Component | Status | Details |
 |-----------|--------|---------|
 | ValidationRule Dataclass | ✅ Complete | Auto-generated validation metadata from Click introspection (10 unit tests) |
@@ -90,23 +90,59 @@ Tracking implementation progress for Claude Code-style REPL UI using prompt-tool
 | Plugin Base Cleanup | ✅ Complete | Removed get_validation_config() and validate_command() methods |
 | Example App Updates | ✅ Complete | Removed manual validation, using click.Choice for deploy command |
 | CLI Mode Validation Tests | ✅ Complete | 13 integration tests for CLI mode validation |
-| Mouse Selection | ✅ Complete | Output window focusable with Ctrl+O toggle |
-| Focus Toggle Key Binding | ✅ Complete | Ctrl+O switches between input and output windows |
-| Welcome Banner Update | ✅ Complete | Added Ctrl+O instruction to welcome message |
+| Mouse Text Selection | ⏸️ Disabled | See "Future Work" section below for how to enable |
 
 **Key Achievements:**
 - ✅ Validation now automatic based on Click decorators (required=True, click.Choice, etc.)
 - ✅ No manual validation methods needed in plugins
 - ✅ Consistent validation between CLI and REPL modes
-- ✅ Mouse text selection in output area (Ctrl+O to toggle focus)
 - ✅ Comprehensive test coverage (31 unit + 13 integration tests)
 
 **Implementation Notes:**
 - ValidationRule stores: level, required_args, optional_args, choice_params, etc.
 - Introspection extracts metadata from cmd.params during plugin loading
 - Auto-validation catches Click exceptions: MissingParameter, BadParameter, UsageError
-- Output window now focusable=True and always_hide_cursor=False
-- Ctrl+O key binding toggles focus between input_buffer and output_buffer
+- Output window is display-only (focusable=False, always_hide_cursor=True)
+
+### Future Work: Mouse Text Selection
+
+**Status:** Disabled for now - needs more investigation
+
+**How to Enable:**
+To enable mouse text selection in the output area, modify `cli_repl_kit/core/repl.py` around line 924:
+
+```python
+output_window = Window(
+    content=BufferControl(
+        buffer=output_buffer,
+        focusable=True,          # Change from False
+        focus_on_click=True,     # Add this parameter
+        include_default_input_processors=False,
+        lexer=ANSILexer(),
+    ),
+    height=D(weight=1),
+    wrap_lines=True,
+    always_hide_cursor=False,    # Change from True
+)
+```
+
+Also add to Layout around line 1022:
+```python
+layout = Layout(
+    HSplit([...]),
+    focused_element=input_buffer,  # Add this to prevent output being focused on startup
+)
+```
+
+**Known Issues:**
+- Mouse selection didn't work reliably in testing
+- May require additional configuration or different approach
+- Research needed: check prompt_toolkit examples for working mouse selection implementation
+
+**References:**
+- [prompt_toolkit BufferControl docs](https://python-prompt-toolkit.readthedocs.io/en/master/pages/reference.html)
+- [Text editor example](https://github.com/prompt-toolkit/python-prompt-toolkit/blob/main/examples/full-screen/text-editor.py)
+- Issue about selection: [#979](https://github.com/prompt-toolkit/python-prompt-toolkit/issues/979)
 
 ### Test Coverage
 - **Config Tests**: 18/18 passing ✅
@@ -152,7 +188,6 @@ Tracking implementation progress for Claude Code-style REPL UI using prompt-tool
 ✅ **Phase D:** ANSI colors configurable via config.yaml with defaults
 ✅ **Phase D:** Styled output preserved (intro banner, errors, etc.)
 ✅ **Phase E:** Automatic validation based on Click decorators - no manual validation methods needed
-✅ **Phase E:** Mouse text selection in output area with Ctrl+O toggle
 ✅ **Phase E:** Consistent validation between CLI and REPL modes
 ✅ **Phase E:** Comprehensive test coverage (160 tests total: 138 unit + 22 integration)
 

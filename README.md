@@ -21,7 +21,6 @@ A simple, reusable framework for building interactive command-line tools with bo
 ✅ **Dual-mode by default** - REPL and CLI modes work automatically
 ✅ **Plugin-based** - Add commands without modifying framework code
 ✅ **Automatic validation** - Validation based on Click decorators, no manual methods needed
-✅ **Mouse selection** - Select and copy output text with Ctrl+O toggle
 ✅ **Subcommand support** - Organize commands with clean arrow notation
 
 ## Installation
@@ -666,19 +665,6 @@ Validation level is automatically determined:
 
 No manual `get_validation_config()` or `validate_command()` methods needed!
 
-### Mouse Selection in Output Area
-
-**NEW!** You can now select and copy text from the output area using your mouse.
-
-#### How to Use
-
-1. Press **Ctrl+O** to toggle focus to the output area
-2. Click and drag to select text with your mouse
-3. Copy selected text with **Ctrl+C** or **Ctrl+Shift+C**
-4. Press **Ctrl+O** again (or click the input area) to return focus
-
-This is especially useful for copying command output, error messages, or long text blocks.
-
 ### Subcommands with Clean Formatting
 
 Organize related commands into groups with automatic arrow notation:
@@ -1077,6 +1063,10 @@ Validation is now automatic based on Click decorators:
 2. Use `click.Choice([...])` for enum validation - invalid choices will be blocked
 3. Check that your Click decorators are correctly applied
 4. For subcommands, validation applies to each subcommand individually
+
+### Why Ctrl+J instead of Shift+Enter for multiline?
+
+Shift+Enter is not reliably supported across different terminals in prompt_toolkit. The key binding requires terminal-specific escape sequences that vary between terminal emulators (iTerm, Terminal.app, gnome-terminal, etc.). Ctrl+J works consistently across all terminals and is the standard prompt_toolkit approach for multiline input.
 
 ## Contributing
 

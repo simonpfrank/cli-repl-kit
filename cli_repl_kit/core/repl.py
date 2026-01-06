@@ -555,7 +555,6 @@ class REPL:
             [("cyan", "│"), ("bold", f"    {self.app_name}"), ("yellow", " v0.1.0"), ("", " " * (box_width - len(self.app_name) - 11)), ("cyan", "│")],
             [("cyan", "│"), ("", "    Type "), ("green", "/quit"), ("", " to exit or "), ("green", "/hello <text>"), ("", " to greet"), ("", " " * (box_width - 48)), ("cyan", "│")],
             [("cyan", "│"), ("", "    Press "), ("yellow", "Ctrl+J"), ("", " for multi-line input, "), ("yellow", "Enter"), ("", " to submit"), ("", " " * (box_width - 54)), ("cyan", "│")],
-            [("cyan", "│"), ("", "    Press "), ("yellow", "Ctrl+O"), ("", " to select output text with mouse"), ("", " " * (box_width - 46)), ("cyan", "│")],
             [("cyan", "│" + " " * box_width + "│")],
             [("cyan", "╰" + "─" * box_width + "╯")],
             [("", "")],
@@ -655,7 +654,7 @@ class REPL:
         #     return result
 
         # NEW Phase D: Buffer-based output with ANSI support
-        # Create output buffer (not read_only since window is focusable=False)
+        # Create output buffer (not read_only so we can write, but focusable=False prevents user edits)
         output_buffer = Buffer(name="output")
 
         # Convert intro banner to ANSI for buffer
@@ -925,13 +924,13 @@ class REPL:
         output_window = Window(
             content=BufferControl(
                 buffer=output_buffer,
-                focusable=True,  # Enable focus for mouse selection (toggle with Ctrl+O)
+                focusable=False,  # Display-only - mouse selection disabled for now
                 include_default_input_processors=False,
                 lexer=ANSILexer(),  # Render ANSI codes as styled text
             ),
             height=D(weight=1),  # Take remaining space
             wrap_lines=True,
-            always_hide_cursor=False,  # Show cursor when focused for selection
+            always_hide_cursor=True,  # No cursor in display-only area
         )
 
         # Function to show prompt (configurable, with dynamic continuation spacing)
@@ -1038,15 +1037,6 @@ class REPL:
         @kb.add("c-c")
         def exit_app(event):
             event.app.exit()
-
-        @kb.add("c-o")
-        def toggle_focus(event):
-            """Toggle focus between input and output windows (Ctrl+O for mouse selection)."""
-            app = event.app
-            if app.layout.has_focus(input_buffer):
-                app.layout.focus(output_buffer)
-            else:
-                app.layout.focus(input_buffer)
 
         @kb.add("escape")
         def clear_input(event):
