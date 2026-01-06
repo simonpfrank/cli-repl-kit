@@ -1,22 +1,23 @@
 # cli-repl-kit
 
+(Still under development and has outstanding defects)
+
 A simple, reusable framework for building interactive command-line tools with both REPL and CLI modes.
 
 ## What is cli-repl-kit?
 
-**cli-repl-kit** makes it easy to create professional command-line applications that work in two ways:
+**cli-repl-kit** makes it easy to create command-line applications that work in two ways:
 
-1. **REPL Mode** (Interactive): Users type commands one at a time, like a chat
+1. **REPL Mode** (Interactive): Users type commands one at a time, like a chat, with options for mulit line text and slash commands or just commands
 2. **CLI Mode** (Traditional): Users run single commands directly from the terminal
 
-**Think of it like this**: Your app is like a restaurant that offers both dine-in (REPL) and takeout (CLI)!
 
 ## Why Use cli-repl-kit?
 
 ✅ **No REPL code to write** - The framework handles the interactive loop for you
 ✅ **Automatic command discovery** - Just declare your commands, no manual registration
 ✅ **Tab completion** - Claude Code style `/` prefix completion built-in
-✅ **Beautiful output** - Rich console styling with colors and themes
+✅ **Beautiful output** - Rich console styling with colors and themes (currently ANSI only)
 ✅ **Dual-mode by default** - REPL and CLI modes work automatically
 ✅ **Plugin-based** - Add commands without modifying framework code
 ✅ **Command validation** - Validate arguments before execution with flexible levels
@@ -171,6 +172,7 @@ A **CommandPlugin** is a class that groups related commands together. Think of i
 - Keeps your commands organized
 - Allows automatic command discovery
 - Easy to add/remove command groups
+- YAML was considered but plugin appears to be more integrated
 
 **Example**: If you're building a file manager, you might have:
 - `FileCommandsPlugin` - for copy, move, delete
@@ -449,9 +451,108 @@ drwxr-xr-x   8 user  staff   256 Jan  5 15:20 ..
 
 The REPL automatically captures and displays all output from external commands!
 
+### Styling Command Output
+
+Add colors, formatting, and styled output to your commands using Rich:
+
+```python
+import click
+from cli_repl_kit import CommandPlugin
+from rich.console import Console
+from rich.table import Table
+
+class StyledCommandsPlugin(CommandPlugin):
+    @property
+    def name(self):
+        return "styled"
+
+    def register(self, cli, context_factory):
+        console = Console()
+
+        @click.command()
+        @click.argument("status", type=click.Choice(["success", "error", "warning"]))
+        def status(status):
+            """Show a styled status message."""
+            if status == "success":
+                console.print("✓ [green]Operation completed successfully![/green]")
+            elif status == "error":
+                console.print("✗ [red]Error: Operation failed![/red]")
+            else:
+                console.print("⚠ [yellow]Warning: Proceed with caution[/yellow]")
+
+        @click.command()
+        def table():
+            """Show a styled table."""
+            table = Table(title="User Data")
+            table.add_column("Name", style="cyan")
+            table.add_column("Status", style="green")
+            table.add_column("Score", justify="right", style="yellow")
+
+            table.add_row("Alice", "Active", "95")
+            table.add_row("Bob", "Inactive", "78")
+            table.add_row("Charlie", "Active", "89")
+
+            console.print(table)
+
+        @click.command()
+        @click.argument("text")
+        def highlight(text):
+            """Print text with various styles."""
+            console.print(f"[bold]Bold:[/bold] {text}")
+            console.print(f"[italic]Italic:[/italic] {text}")
+            console.print(f"[underline]Underlined:[/underline] {text}")
+            console.print(f"[red]Red:[/red] {text}")
+            console.print(f"[green]Green:[/green] {text}")
+            console.print(f"[blue]Blue:[/blue] {text}")
+
+        cli.add_command(status, name="status")
+        cli.add_command(table, name="table")
+        cli.add_command(highlight, name="highlight")
+```
+
+**Output examples:**
+```
+> /status success
+● /status
+  ⎿ success
+✓ Operation completed successfully!    [in green]
+
+> /table
+● /table
+╭─────────────────────────────────╮
+│         User Data               │
+├─────────┬──────────┬───────────┤
+│ Name    │ Status   │ Score     │
+├─────────┼──────────┼───────────┤
+│ Alice   │ Active   │        95 │
+│ Bob     │ Inactive │        78 │
+│ Charlie │ Active   │        89 │
+╰─────────┴──────────┴───────────╯
+
+> /highlight test
+● /highlight
+  ⎿ test
+Bold: test
+Italic: test
+Underlined: test
+Red: test        [each line in its respective color/style]
+Green: test
+Blue: test
+```
+
+**Available Rich features:**
+- **Colors**: `[red]`, `[green]`, `[blue]`, `[yellow]`, `[cyan]`, `[magenta]`
+- **Styles**: `[bold]`, `[italic]`, `[underline]`, `[dim]`, `[strike]`
+- **Tables**: Create formatted tables with borders and colors
+- **Progress bars**: Show progress for long operations
+- **Syntax highlighting**: Display code with syntax coloring
+- **Panels**: Create bordered boxes around content
+
+See the [Rich documentation](https://rich.readthedocs.io/) for more styling options!
+
 ## Try the Live Demo
 
-The repository includes a fully working demo app that showcases all framework features.
+The repository includes a simple working demo app that showcases most framework features.
 
 ### Running the Demo
 
@@ -662,13 +763,65 @@ def my_command(ctx):
 
 Contributions are welcome! Please follow these guidelines:
 
-1. **Write tests first** (TDD methodology)
+1. **Write tests first** (TDD methodology) - Define expected behavior with tests before implementing
 2. **Keep it simple** - This framework prioritizes clarity over complexity
 3. **Document for beginners** - Assume users have basic Python knowledge
-4. **Run tests** before submitting:
+4. **Follow code quality standards**:
+   - Run `ruff check . --fix` to fix linting issues
+   - Ensure all tests pass with `python -m pytest -xvs`
+   - Add tests for new features
+
+### How to Submit Changes
+
+1. **Fork the repository** on GitHub
+2. **Clone your fork** locally:
+   ```bash
+   git clone https://github.com/YOUR-USERNAME/cli-repl-kit.git
+   cd cli-repl-kit
+   ```
+
+3. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   # or
+   git checkout -b fix/your-bug-fix
+   ```
+
+4. **Install in development mode**:
+   ```bash
+   pip install -e .
+   ```
+
+5. **Make your changes** following TDD:
+   - Write tests first
+   - Implement the feature
+   - Run tests to verify
+   - Fix any linting issues with `ruff check . --fix`
+
+6. **Run all tests** to ensure nothing broke:
    ```bash
    python -m pytest -xvs
    ```
+
+7. **Commit your changes** with a descriptive message:
+   ```bash
+   git add .
+   git commit -m "feat: Add new feature description"
+   # or
+   git commit -m "fix: Fix bug description"
+   ```
+
+8. **Push to your fork**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+9. **Create a Pull Request**:
+   - Go to the original repository on GitHub
+   - Click "New Pull Request"
+   - Select your fork and branch
+   - Describe your changes and why they're needed
+   - Link any related issues
 
 ### Development Setup
 
@@ -692,6 +845,16 @@ python -m pytest tests/integration/ -xvs
 
 # With coverage
 python -m pytest --cov=cli_repl_kit
+```
+
+### Code Quality Checks
+
+```bash
+# Run linting and auto-fix issues
+ruff check . --fix
+
+# Check for remaining issues
+ruff check .
 ```
 
 ## License
