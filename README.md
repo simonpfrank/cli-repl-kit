@@ -17,7 +17,7 @@ A simple, reusable framework for building interactive command-line tools with bo
 ✅ **No REPL code to write** - The framework handles the interactive loop for you
 ✅ **Automatic command discovery** - Just declare your commands, no manual registration
 ✅ **Tab completion** - Claude Code style `/` prefix completion built-in
-✅ **Beautiful output** - Rich console styling with colors and themes (currently ANSI only)
+✅ **Beautiful output** - Rich console styling with colors and themes using `Rich`
 ✅ **Dual-mode by default** - REPL and CLI modes work automatically
 ✅ **Plugin-based** - Add commands without modifying framework code
 ✅ **Automatic validation** - Validation based on Click decorators, no manual methods needed
