@@ -1018,7 +1018,7 @@ class REPL:
                 return
 
             # Format and display command with icons
-            formatted_lines = format_command_display(original_text, has_error=False)
+            formatted_lines = format_command_display(text, has_error=False)
             for line in formatted_lines:
                 add_output_line(line)
 
