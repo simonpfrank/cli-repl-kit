@@ -284,7 +284,7 @@ class TestPhaseD1FormattedToANSI:
     def test_formatted_text_to_ansi_string_empty_list(self):
         """Test formatted_text_to_ansi_string with empty list."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
+        from cli_repl_kit.core.formatting import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         result = formatted_text_to_ansi_string([], config)
@@ -293,7 +293,7 @@ class TestPhaseD1FormattedToANSI:
     def test_formatted_text_to_ansi_string_plain_text(self):
         """Test formatted_text_to_ansi_string with plain text (no style)."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
+        from cli_repl_kit.core.formatting import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("", "Hello World")]
@@ -303,7 +303,7 @@ class TestPhaseD1FormattedToANSI:
     def test_formatted_text_to_ansi_string_single_color(self):
         """Test formatted_text_to_ansi_string with single color."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
+        from cli_repl_kit.core.formatting import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("red", "Error message")]
@@ -313,7 +313,7 @@ class TestPhaseD1FormattedToANSI:
     def test_formatted_text_to_ansi_string_bold_style(self):
         """Test formatted_text_to_ansi_string with bold style."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
+        from cli_repl_kit.core.formatting import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("bold", "Bold text")]
@@ -323,7 +323,7 @@ class TestPhaseD1FormattedToANSI:
     def test_formatted_text_to_ansi_string_combined_style(self):
         """Test formatted_text_to_ansi_string with combined style."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
+        from cli_repl_kit.core.formatting import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("cyan bold", "Cyan bold text")]
@@ -335,7 +335,7 @@ class TestPhaseD1FormattedToANSI:
     def test_formatted_text_to_ansi_string_multiple_fragments(self):
         """Test formatted_text_to_ansi_string with multiple fragments."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
+        from cli_repl_kit.core.formatting import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [
@@ -351,7 +351,7 @@ class TestPhaseD1FormattedToANSI:
     def test_formatted_text_to_ansi_string_unknown_style(self):
         """Test formatted_text_to_ansi_string with unknown style (should output plain text)."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
+        from cli_repl_kit.core.formatting import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("unknown_style", "Text")]
@@ -367,7 +367,7 @@ class TestPhaseD2ANSILexer:
         """Test ANSILexer with plain text (no ANSI codes)."""
         from prompt_toolkit.document import Document
 
-        from cli_repl_kit.core.repl import ANSILexer
+        from cli_repl_kit.core.formatting import ANSILexer
 
         lexer = ANSILexer()
         doc = Document("Hello World")
@@ -384,7 +384,7 @@ class TestPhaseD2ANSILexer:
         """Test ANSILexer with ANSI color codes."""
         from prompt_toolkit.document import Document
 
-        from cli_repl_kit.core.repl import ANSILexer
+        from cli_repl_kit.core.formatting import ANSILexer
 
         lexer = ANSILexer()
         # Text with ANSI red color
@@ -400,7 +400,7 @@ class TestPhaseD2ANSILexer:
         """Test ANSILexer with multiple lines."""
         from prompt_toolkit.document import Document
 
-        from cli_repl_kit.core.repl import ANSILexer
+        from cli_repl_kit.core.formatting import ANSILexer
 
         lexer = ANSILexer()
         doc = Document("Line 1\nLine 2\nLine 3")
@@ -419,7 +419,7 @@ class TestPhaseD2ANSILexer:
         """Test ANSILexer with empty line."""
         from prompt_toolkit.document import Document
 
-        from cli_repl_kit.core.repl import ANSILexer
+        from cli_repl_kit.core.formatting import ANSILexer
 
         lexer = ANSILexer()
         doc = Document("")
