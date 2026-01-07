@@ -22,34 +22,11 @@ from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 from prompt_toolkit.lexers import Lexer
 
 from cli_repl_kit.core.formatting import ANSILexer, formatted_text_to_ansi_string
+from cli_repl_kit.core.layout import ConditionalScrollbarMargin
 from cli_repl_kit.core.output_capture import OutputCapture
 from cli_repl_kit.core.state import REPLState
 from cli_repl_kit.plugins.base import ValidationResult
 from cli_repl_kit.plugins.validation import ValidationRule
-
-
-class ConditionalScrollbarMargin(Margin):
-    """Scrollbar margin that only renders when a condition is met."""
-
-    def __init__(self, buffer, max_lines=10, display_arrows=True):
-        self.buffer = buffer
-        self.max_lines = max_lines
-        self.scrollbar = ScrollbarMargin(display_arrows=display_arrows)
-
-    def get_width(self, ui_content):
-        """Return width only if condition is met."""
-        line_count = max(1, self.buffer.text.count("\n") + 1) if self.buffer.text else 1
-        if line_count >= self.max_lines:
-            return self.scrollbar.get_width(ui_content)
-        return 0
-
-    def create_margin(self, window_render_info, width, height):
-        """Render scrollbar only if at max lines."""
-        line_count = max(1, self.buffer.text.count("\n") + 1) if self.buffer.text else 1
-        if line_count >= self.max_lines:
-            return self.scrollbar.create_margin(window_render_info, width, height)
-        # Return a function that returns empty formatted text (accept any args)
-        return lambda *args, **kwargs: []
 
 
 class REPL:
