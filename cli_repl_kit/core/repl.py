@@ -21,6 +21,7 @@ from prompt_toolkit.layout.dimension import Dimension as D
 from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 from prompt_toolkit.lexers import Lexer
 
+from cli_repl_kit.core.state import REPLState
 from cli_repl_kit.plugins.base import ValidationResult
 from cli_repl_kit.plugins.validation import ValidationRule
 
@@ -591,18 +592,8 @@ class REPL:
 
         intro_text = intro_lines
 
-        # State - use a mutable container so closures can modify it
-        state = {
-            "completions": [],
-            "selected_idx": 0,
-            "placeholder_active": False,  # Track if <text> placeholder is shown
-            "placeholder_start": 0,  # Cursor position where placeholder starts
-            "status_text": [],  # Status line content (FormattedText)
-            "info_text": [],  # Info line content (FormattedText)
-            "slash_command_active": False,  # True when input starts with /
-            "is_multiline": False,  # True when input has \n
-            "menu_keep_visible": False,  # Keep menu expanded after command to avoid jarring jumps
-        }
+        # State - typed state object (replaces mutable dict)
+        state = REPLState()
 
         # Helper to get argument info for a command
         def get_argument_placeholder_text(cmd_name, subcmd_name=None):
@@ -783,20 +774,20 @@ class REPL:
         # Render status line
         def render_status():
             """Render status line content."""
-            if not state["status_text"]:
+            if not state.status_text:
                 return []
-            return state["status_text"]
+            return state.status_text
 
         # Render info line
         def render_info():
             """Render info line content."""
-            if not state["info_text"]:
+            if not state.info_text:
                 return []
-            return state["info_text"]
+            return state.info_text
 
         # Render completion menu
         def render_completions():
-            if not state["completions"]:
+            if not state.completions:
                 return []
 
             text = input_buffer.text
@@ -804,8 +795,8 @@ class REPL:
 
             # Calculate visible window of completions based on menu height
             menu_height = self.config.windows.menu.height
-            total_completions = len(state["completions"])
-            selected_idx = state["selected_idx"]
+            total_completions = len(state.completions)
+            selected_idx = state.selected_idx
 
             # Calculate the window of completions to show
             if total_completions <= menu_height:
@@ -825,7 +816,7 @@ class REPL:
 
             lines = []
             for i in range(start_idx, end_idx):
-                comp = state["completions"][i]
+                comp = state.completions[i]
                 cmd_text = str(comp.text)
                 help_text = comp.display_meta if hasattr(comp, "display_meta") else ""
                 if isinstance(help_text, list):
@@ -840,7 +831,7 @@ class REPL:
                 grey_color = self.config.colors.grey
                 style = (
                     f"{highlight_color} bold"
-                    if i == state["selected_idx"]
+                    if i == state.selected_idx
                     else grey_color
                 )
                 lines.append((style, formatted))
@@ -853,17 +844,17 @@ class REPL:
             text = input_buffer.text
 
             # Update state tracking
-            state["slash_command_active"] = text.startswith("/")
-            state["is_multiline"] = "\n" in text
+            state.slash_command_active = text.startswith("/")
+            state.is_multiline = "\n" in text
 
             # Handle placeholder removal when user starts typing
-            if state["placeholder_active"] and bool(
+            if state.placeholder_active and bool(
                 re.search("<[a-z0-9_]+>", text)
             ):  # SF 6/1 for any text arg
-                # if state["placeholder_active"] and "<text>" in text:
+                # if state.placeholder_active and "<text>" in text:
                 cursor_pos = input_buffer.cursor_position
                 # If user is typing after the placeholder start position
-                if cursor_pos > state["placeholder_start"]:
+                if cursor_pos > state.placeholder_start:
                     # Find and remove the <text> placeholder
                     placeholder = re.search(
                         "<[a-z0-9_]+>", text
@@ -884,7 +875,7 @@ class REPL:
                         )
                         input_buffer.text = new_text
                         input_buffer.cursor_position = new_cursor
-                        state["placeholder_active"] = False
+                        state.placeholder_active = False
                         return  # Exit early since we modified the buffer
 
             if text.startswith("/"):
@@ -893,17 +884,17 @@ class REPL:
 
                 doc = Document(text, len(text))
                 completions = list(completer.get_completions(doc, CompleteEvent()))
-                state["completions"] = completions
-                state["selected_idx"] = 0 if completions else -1
+                state.completions = completions
+                state.selected_idx = 0 if completions else -1
 
                 # Set menu_keep_visible when menu is shown
                 if completions:
-                    state["menu_keep_visible"] = True
+                    state.menu_keep_visible = True
             else:
-                state["completions"] = []
-                state["selected_idx"] = -1
+                state.completions = []
+                state.selected_idx = -1
                 # Clear menu_keep_visible when user types non-slash
-                state["menu_keep_visible"] = False
+                state.menu_keep_visible = False
 
         # Create input buffer
         input_buffer = Buffer(
@@ -977,7 +968,7 @@ class REPL:
         # Dynamic info height - show 1 line when info text is set, otherwise 0
         def get_info_height():
             """Calculate info height dynamically based on whether info is set."""
-            if state["info_text"]:
+            if state.info_text:
                 return D(preferred=1, min=1, max=1)
             else:
                 return D(preferred=0, min=0, max=0)
@@ -999,9 +990,7 @@ class REPL:
             Keep menu visible after command execution to avoid jarring position jumps.
             Only collapse when user explicitly types non-slash input or clears.
             """
-            if (state["slash_command_active"] and state["completions"]) or state[
-                "menu_keep_visible"
-            ]:
+            if (state.slash_command_active and state.completions) or state.menu_keep_visible:
                 # Show full menu when slash command active OR when keeping visible after execution
                 return D(preferred=menu_preferred_height)
             else:
@@ -1041,8 +1030,8 @@ class REPL:
             """Clear the input buffer on ESC."""
             event.current_buffer.text = ""
             event.current_buffer.cursor_position = 0
-            state["placeholder_active"] = False
-            state["menu_keep_visible"] = False  # Collapse menu when clearing input
+            state.placeholder_active = False
+            state.menu_keep_visible = False  # Collapse menu when clearing input
             event.app.invalidate()
 
         @kb.add("c-j")
@@ -1055,14 +1044,14 @@ class REPL:
             buffer = event.current_buffer
 
             # Context 1: Slash command active with > 1 option - navigate menu
-            if state["slash_command_active"] and len(state["completions"]) > 1:
-                if state["selected_idx"] > 0:
-                    state["selected_idx"] -= 1
+            if state.slash_command_active and len(state.completions) > 1:
+                if state.selected_idx > 0:
+                    state.selected_idx -= 1
                     event.app.invalidate()
                 return
 
             # Context 2: Multi-line input - move cursor up one line
-            if state["is_multiline"]:
+            if state.is_multiline:
                 buffer.cursor_up()
                 event.app.invalidate()
                 return
@@ -1084,14 +1073,14 @@ class REPL:
             buffer = event.current_buffer
 
             # Context 1: Slash command active with > 1 option - navigate menu
-            if state["slash_command_active"] and len(state["completions"]) > 1:
-                if state["selected_idx"] < len(state["completions"]) - 1:
-                    state["selected_idx"] += 1
+            if state.slash_command_active and len(state.completions) > 1:
+                if state.selected_idx < len(state.completions) - 1:
+                    state.selected_idx += 1
                     event.app.invalidate()
                 return
 
             # Context 2: Multi-line input - move cursor down one line
-            if state["is_multiline"]:
+            if state.is_multiline:
                 buffer.cursor_down()
                 event.app.invalidate()
                 return
@@ -1129,10 +1118,10 @@ class REPL:
         @kb.add("tab")
         def do_tab(event):
             """Complete command and add argument placeholder if needed."""
-            if not state["completions"] or state["selected_idx"] < 0:
+            if not state.completions or state.selected_idx < 0:
                 return
 
-            comp = state["completions"][state["selected_idx"]]
+            comp = state.completions[state.selected_idx]
             buffer = event.current_buffer
 
             # Delete what the completion replaces
@@ -1164,8 +1153,8 @@ class REPL:
                     # Position cursor at start of placeholder (on the <)
                     cursor_pos = buffer.cursor_position - len(arg_placeholder)
                     buffer.cursor_position = cursor_pos
-                    state["placeholder_active"] = True
-                    state["placeholder_start"] = cursor_pos
+                    state.placeholder_active = True
+                    state.placeholder_start = cursor_pos
 
             event.app.invalidate()
 
@@ -1193,8 +1182,8 @@ class REPL:
                             buffer.insert_text(" " + arg_placeholder)
                             cursor_pos = buffer.cursor_position - len(arg_placeholder)
                             buffer.cursor_position = cursor_pos
-                            state["placeholder_active"] = True
-                            state["placeholder_start"] = cursor_pos
+                            state.placeholder_active = True
+                            state.placeholder_start = cursor_pos
                         else:
                             buffer.insert_text(" ")
                     event.app.invalidate()
@@ -1212,8 +1201,8 @@ class REPL:
                             buffer.insert_text(" " + arg_placeholder)
                             cursor_pos = buffer.cursor_position - len(arg_placeholder)
                             buffer.cursor_position = cursor_pos
-                            state["placeholder_active"] = True
-                            state["placeholder_start"] = cursor_pos
+                            state.placeholder_active = True
+                            state.placeholder_start = cursor_pos
                             event.app.invalidate()
                             return
 
@@ -1234,11 +1223,11 @@ class REPL:
 
             # Auto-complete if partial match or just "/"
             if (
-                state["completions"]
-                and state["selected_idx"] >= 0
+                state.completions
+                and state.selected_idx >= 0
                 and text.startswith("/")
             ):
-                comp = state["completions"][state["selected_idx"]]
+                comp = state.completions[state.selected_idx]
                 parts = text.split(maxsplit=1)
                 first_word = parts[0][1:] if parts else ""  # Remove /
                 rest_of_text = parts[1] if len(parts) > 1 else ""
@@ -1352,7 +1341,7 @@ class REPL:
 
             # Clear buffer
             buffer.text = ""
-            state["placeholder_active"] = False
+            state.placeholder_active = False
 
             # Handle quit/exit
             if cmd_name in ["quit", "exit"]:
@@ -1534,16 +1523,16 @@ class REPL:
 
         if hasattr(self, "_current_state"):
             if style:
-                self._current_state["status_text"] = [(style, text)]
+                self._current_state.status_text = [(style, text)]
             else:
-                self._current_state["status_text"] = [("", text)]
+                self._current_state.status_text = [("", text)]
             if hasattr(self, "_current_app"):
                 self._current_app.invalidate()
 
     def clear_status(self):
         """Clear status line."""
         if hasattr(self, "_current_state"):
-            self._current_state["status_text"] = []
+            self._current_state.status_text = []
             if hasattr(self, "_current_app"):
                 self._current_app.invalidate()
 
@@ -1562,15 +1551,15 @@ class REPL:
 
         if hasattr(self, "_current_state"):
             if style:
-                self._current_state["info_text"] = [(style, text)]
+                self._current_state.info_text = [(style, text)]
             else:
-                self._current_state["info_text"] = [("", text)]
+                self._current_state.info_text = [("", text)]
             if hasattr(self, "_current_app"):
                 self._current_app.invalidate()
 
     def clear_info(self):
         """Clear info line."""
         if hasattr(self, "_current_state"):
-            self._current_state["info_text"] = []
+            self._current_state.info_text = []
             if hasattr(self, "_current_app"):
                 self._current_app.invalidate()
