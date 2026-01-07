@@ -631,7 +631,7 @@ class REPL:
         # Grey divider
         divider_color = self.config.colors.divider
 
-        def grey_line():
+        def create_divider_window():
             return Window(
                 height=1,
                 content=FormattedTextControl(text=lambda: [(divider_color, "─" * 200)]),
@@ -1020,9 +1020,9 @@ class REPL:
                 [
                     output_window,
                     status_window,
-                    grey_line(),
+                    create_divider_window(),
                     input_window,
-                    grey_line(),
+                    create_divider_window(),
                     info_window,
                     menu_window,
                 ]
