@@ -21,6 +21,7 @@ from prompt_toolkit.layout.dimension import Dimension as D
 from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 from prompt_toolkit.lexers import Lexer
 
+from cli_repl_kit.core.command_executor import CommandExecutor
 from cli_repl_kit.core.formatting import ANSILexer, formatted_text_to_ansi_string
 from cli_repl_kit.core.key_bindings import KeyBindingManager
 from cli_repl_kit.core.layout import ConditionalScrollbarMargin, LayoutBuilder
@@ -345,107 +346,13 @@ class REPL:
                 text=new_text, cursor_position=len(new_text)
             )
 
-        def format_command_display(command_text, has_error=False, has_warning=False):
-            """Format command for display with icons and proper styling.
-
-            Args:
-                command_text: The full command text (with or without /)
-                has_error: Whether the command resulted in an error (red bullet)
-                has_warning: Whether the command has a warning (yellow warning icon)
-
-            Returns:
-                List of lines to display (each line is FormattedText)
-            """
-            # Remove leading / if present
-            if command_text.startswith("/"):
-                command_text = command_text[1:]
-
-            # Parse command and arguments
-            parts = command_text.split(maxsplit=1)
-            if not parts:
-                return []
-
-            cmd_name = parts[0]
-            has_args = len(parts) > 1
-            args_text = parts[1] if has_args else ""
-
-            # Parse subcommands from args
-            subcommand_chain = []
-            remaining_text = args_text
-
-            if has_args and hasattr(self.cli, "commands"):
-                # Try to find subcommands by walking the command tree
-                current_cmd = self.cli.commands.get(cmd_name)
-                arg_words = args_text.split()
-
-                for i, word in enumerate(arg_words):
-                    # Check if current command is a group with this subcommand
-                    if (
-                        current_cmd
-                        and hasattr(current_cmd, "commands")
-                        and word in current_cmd.commands
-                    ):
-                        subcommand_chain.append(word)
-                        current_cmd = current_cmd.commands[word]
-                    else:
-                        # Rest is free text
-                        remaining_text = " ".join(arg_words[i:])
-                        break
-                else:
-                    # All args were subcommands
-                    remaining_text = ""
-
-            # Choose icon based on command structure and status
-            if has_warning:
-                # Optional validation warning - yellow warning icon
-                icon = self.config.symbols.warning  # ⚠
-                icon_color = self.config.colors.warning  # yellow
-            elif has_args:
-                # Command with arguments - grey square
-                icon = self.config.symbols.command_with_args  # ■
-                icon_color = self.config.colors.grey
-            else:
-                # Simple command - success/error icon with color
-                if has_error:
-                    icon = self.config.symbols.command_error  # ●
-                    icon_color = self.config.colors.error  # red
-                else:
-                    icon = self.config.symbols.command_success  # ●
-                    icon_color = self.config.colors.success  # green
-
-            # Build command display line with subcommands
-            cmd_display = [
-                (icon_color, icon + " "),
-                (self.config.colors.grey, "/" + cmd_name),
-            ]
-
-            # Add subcommands with arrow icons
-            arrow = " → "
-            for subcmd in subcommand_chain:
-                cmd_display.append((self.config.colors.grey, arrow + subcmd))
-
-            # If no remaining text, return single line
-            if not remaining_text:
-                return [cmd_display]
-
-            # If has remaining text, add it on next line with indent
-            lines = [cmd_display]
-
-            # Add remaining text with indent symbol
-            indent_symbol = self.config.symbols.indent  # ⎿
-            indent_prefix = [(self.config.colors.grey, indent_symbol + " ")]
-
-            # Handle multi-line remaining text
-            text_lines = remaining_text.split("\n")
-            for i, text_line in enumerate(text_lines):
-                if i == 0:
-                    # First line with indent symbol
-                    lines.append(indent_prefix + [("", text_line)])
-                else:
-                    # Continuation lines indented by 2 spaces
-                    lines.append([("", "  " + text_line)])
-
-            return lines
+        # Create command executor
+        command_executor = CommandExecutor(
+            config=self.config,
+            cli=self.cli,
+            validate_callback=self._validate_command,
+            append_output_callback=append_to_output_buffer,
+        )
 
         # Update completions on text change
         def on_text_changed(_):
@@ -519,126 +426,8 @@ class REPL:
 
         # Command execution callback for key bindings
         def execute_command_callback(text: str, event: Any) -> None:
-            """Execute a command entered by the user.
-
-            Args:
-                text: The command text to execute
-                event: The key event (for app.invalidate())
-            """
-            # Parse command name and args early for validation
-            if text.startswith("/"):
-                command = text[1:]
-            elif enable_agent_mode:
-                append_to_output_buffer([("cyan", "Echo: "), ("", text)])
-                append_to_output_buffer([("", "")])
-                event.app.invalidate()
-                return
-            else:
-                command = text
-
-            args = command.split()
-            if not args:
-                return
-
-            cmd_name = args[0]
-            cmd_args = args[1:]
-
-            # Check if command exists
-            command_exists = cmd_name in [
-                "quit",
-                "exit",
-                "status",
-                "info",
-            ] or (hasattr(self.cli, "commands") and cmd_name in self.cli.commands)
-
-            # Validate command before showing icon
-            validation_result, validation_level = self._validate_command(
-                cmd_name, cmd_args
-            )
-
-            # Determine if command should be blocked
-            should_block = False
-            has_warning = False
-            has_error = False
-
-            if not command_exists:
-                has_error = True
-            elif validation_level == "required" and validation_result.should_block():
-                should_block = True
-                has_error = True
-            elif validation_level == "optional" and validation_result.should_warn():
-                has_warning = True
-                has_error = False
-            else:
-                has_error = False
-
-            # Format and display command with appropriate icon
-            formatted_lines = format_command_display(
-                text, has_error=has_error, has_warning=has_warning
-            )
-            for line in formatted_lines:
-                append_to_output_buffer(line)
-
-            # Display validation message if present
-            if validation_result.message:
-                if should_block:
-                    append_to_output_buffer(
-                        [
-                            (
-                                "red",
-                                f"{self.config.symbols.error} {validation_result.message}",
-                            )
-                        ]
-                    )
-                elif has_warning:
-                    append_to_output_buffer(
-                        [
-                            (
-                                "yellow",
-                                f"{self.config.symbols.warning} {validation_result.message}",
-                            )
-                        ]
-                    )
-
-            # Block execution if validation failed
-            if should_block:
-                append_to_output_buffer([("", "")])
-                event.app.invalidate()
-                return
-
-            # Add to history before clearing buffer
-            input_buffer.append_to_history()
-
-            # Handle quit/exit
-            if cmd_name in ["quit", "exit"]:
-                append_to_output_buffer([("", "Goodbye!")])
-                event.app.invalidate()
-                event.app.exit()
-                return
-
-            # Execute command
-            if hasattr(self.cli, "commands") and cmd_name in self.cli.commands:
-                cmd = self.cli.commands[cmd_name]
-                # Check if it's a group with subcommand
-                if hasattr(cmd, "commands"):
-                    if cmd_args and cmd_args[0] in cmd.commands:
-                        subcmd = cmd.commands[cmd_args[0]]
-                        subcmd_args = cmd_args[1:]
-                        self._execute_click_command(
-                            subcmd, subcmd_args, state, append_to_output_buffer
-                        )
-                    else:
-                        append_to_output_buffer([("", "")])
-                else:
-                    # Regular command
-                    self._execute_click_command(cmd, cmd_args, state, append_to_output_buffer)
-            else:
-                append_to_output_buffer([("red", f"Unknown command: {cmd_name}")])
-
-            # Add empty line after command output
-            append_to_output_buffer([("", "")])
-
-            event.app.invalidate()
+            """Execute a command via CommandExecutor."""
+            command_executor.execute_command(text, input_buffer, enable_agent_mode, event)
 
         # Create key bindings using KeyBindingManager
         key_manager = KeyBindingManager(
@@ -684,54 +473,6 @@ class REPL:
             # Restore original streams
             sys.stdout = original_stdout
             sys.stderr = original_stderr
-
-    def _execute_click_command(self, cmd, args, state, add_output_line=None):
-        """Execute a Click command and capture output.
-
-        Args:
-            cmd: The Click command to execute
-            args: Command arguments
-            state: State dictionary
-            add_output_line: Callback to add output with auto-scroll
-        """
-        append_to_output_buffer = add_output_line
-
-        stdout_buf = io.StringIO()
-        stderr_buf = io.StringIO()
-
-        try:
-            ctx = click.Context(cmd)
-
-            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
-                # For commands with nargs=-1, pass args as tuple
-                if hasattr(cmd, "params"):
-                    for param in cmd.params:
-                        if isinstance(param, click.Argument) and param.nargs == -1:
-                            # Pass as keyword argument with tuple
-                            ctx.invoke(cmd, **{param.name: tuple(args)})
-                            break
-                    else:
-                        # No nargs=-1 args, invoke normally
-                        ctx.invoke(cmd, *args)
-                else:
-                    ctx.invoke(cmd, *args)
-        except SystemExit:
-            pass
-        except click.exceptions.MissingParameter as e:
-            append_to_output_buffer([("red", f"Missing argument: {e.param.name}")])
-        except Exception as e:
-            append_to_output_buffer([("red", f"Error: {str(e)}")])
-
-        # Add output
-        stdout_text = stdout_buf.getvalue()
-        stderr_text = stderr_buf.getvalue()
-
-        if stdout_text:
-            for line in stdout_text.rstrip().split("\n"):
-                append_to_output_buffer([("", line)])
-        if stderr_text:
-            for line in stderr_text.rstrip().split("\n"):
-                append_to_output_buffer([("red", line)])
 
     # API methods for status and info lines
 
