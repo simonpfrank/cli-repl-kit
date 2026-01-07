@@ -1,5 +1,7 @@
 # cli-repl-kit
 
+**Warning** This was produced in hurry with some Vibe Coding sins along the way and therefore functionally it is not bad, but right now it is a nightmare for maintainability and coding standards, it is undergoing refactoring.
+
 (Still under development and has outstanding defects, and critical code structure issues, being AI developed. Refactor underway)
 
 A simple, reusable framework for building interactive command-line tools with both REPL and CLI modes.
