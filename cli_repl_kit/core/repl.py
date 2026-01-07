@@ -175,6 +175,9 @@ class REPL:
                 # Handle arguments
                 # An argument is required if param.required is True
                 # (Click sets required=False when a default is provided)
+                if param.name is None:
+                    continue  # Skip parameters without names
+
                 is_required = param.required
 
                 if is_required:
@@ -203,6 +206,9 @@ class REPL:
 
             elif isinstance(param, click.Option):
                 # Handle options
+                if param.name is None:
+                    continue  # Skip options without names
+
                 if param.required:
                     rule.required_options.append(param.name)
                     has_required_params = True
@@ -260,7 +266,7 @@ class REPL:
         rule = self.validation_rules[cmd_path]
 
         # No validation needed
-        if rule.level == "none":
+        if rule.level == "none" or rule.click_command is None:
             return (ValidationResult(status="valid"), None)
 
         # Use Click's native validation by attempting to parse args
@@ -273,10 +279,11 @@ class REPL:
 
         except click.exceptions.MissingParameter as e:
             # Required parameter missing
+            param_name = e.param.name if e.param else "unknown"
             return (
                 ValidationResult(
                     status="invalid",
-                    message=f"Missing required argument: {e.param.name}",
+                    message=f"Missing required argument: {param_name}",
                 ),
                 rule.level,
             )
@@ -1261,7 +1268,7 @@ class REPL:
             event.app.invalidate()
 
         # Create application
-        app = Application(
+        app: Application[None] = Application(
             layout=layout,
             key_bindings=kb,
             full_screen=True,
