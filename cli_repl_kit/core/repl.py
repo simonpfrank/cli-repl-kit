@@ -255,22 +255,6 @@ class REPL:
             message = " ".join(text)
             sys.stderr.write(message + "\n")
 
-        @self.cli.command(name="status")
-        @click.argument("text", nargs=-1, required=False)
-        def status_command(text):
-            """Set or clear status line text."""
-            # Note: This command needs access to set_status() from REPL
-            # Will be called during REPL execution where set_status is available
-            pass  # Implementation will be in REPL context
-
-        @self.cli.command(name="info")
-        @click.argument("text", nargs=-1, required=False)
-        def info_command(text):
-            """Set or clear info line text."""
-            # Note: This command needs access to set_info() from REPL
-            # Will be called during REPL execution where set_info is available
-            pass  # Implementation will be in REPL context
-
     def _load_plugins(self):
         """Discover and register plugins from entry points."""
         discovered = entry_points(group=self.plugin_group)
