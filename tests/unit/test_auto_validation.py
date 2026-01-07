@@ -160,7 +160,7 @@ class TestClickIntrospection:
             pass
 
         repl = REPL(app_name="test")
-        rule = repl._extract_validation_rule(cmd, "cmd")
+        rule = repl.validation_manager._extract_validation_rule(cmd, "cmd")
 
         assert rule.level == "required"
         assert "name" in rule.required_args
@@ -176,7 +176,7 @@ class TestClickIntrospection:
             pass
 
         repl = REPL(app_name="test")
-        rule = repl._extract_validation_rule(cmd, "cmd")
+        rule = repl.validation_manager._extract_validation_rule(cmd, "cmd")
 
         assert rule.level == "optional"
         assert "name" in rule.optional_args
@@ -191,7 +191,7 @@ class TestClickIntrospection:
             pass
 
         repl = REPL(app_name="test")
-        rule = repl._extract_validation_rule(cmd, "cmd")
+        rule = repl.validation_manager._extract_validation_rule(cmd, "cmd")
 
         assert rule.level == "required"
         assert "env" in rule.choice_params
@@ -208,7 +208,7 @@ class TestClickIntrospection:
             pass
 
         repl = REPL(app_name="test")
-        rule = repl._extract_validation_rule(cmd, "cmd")
+        rule = repl.validation_manager._extract_validation_rule(cmd, "cmd")
 
         assert rule.level == "required"
         assert "source" in rule.required_args
@@ -225,7 +225,7 @@ class TestClickIntrospection:
             pass
 
         repl = REPL(app_name="test")
-        rule = repl._extract_validation_rule(cmd, "cmd")
+        rule = repl.validation_manager._extract_validation_rule(cmd, "cmd")
 
         assert rule.level == "required"
         assert "files" in rule.required_args
@@ -241,7 +241,7 @@ class TestClickIntrospection:
             pass
 
         repl = REPL(app_name="test")
-        rule = repl._extract_validation_rule(cmd, "cmd")
+        rule = repl.validation_manager._extract_validation_rule(cmd, "cmd")
 
         assert rule.level == "required"
         assert "config" in rule.required_options
@@ -257,7 +257,7 @@ class TestClickIntrospection:
             pass
 
         repl = REPL(app_name="test")
-        rule = repl._extract_validation_rule(cmd, "cmd")
+        rule = repl.validation_manager._extract_validation_rule(cmd, "cmd")
 
         assert rule.level == "none"
         assert len(rule.required_args) == 0
@@ -278,7 +278,7 @@ class TestClickIntrospection:
             pass
 
         repl = REPL(app_name="test")
-        rule = repl._extract_validation_rule(set, "config.set")
+        rule = repl.validation_manager._extract_validation_rule(set, "config.set")
 
         assert rule.level == "required"
         assert rule.click_command == set
@@ -305,12 +305,12 @@ class TestCommandTreeWalking:
         repl.cli.add_command(hello, name="hello")
         repl.cli.add_command(quit, name="quit")
 
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        assert "hello" in repl.validation_rules
-        assert "quit" in repl.validation_rules
-        assert repl.validation_rules["hello"].level == "required"
-        assert repl.validation_rules["quit"].level == "none"
+        assert "hello" in repl.validation_manager.validation_rules
+        assert "quit" in repl.validation_manager.validation_rules
+        assert repl.validation_manager.validation_rules["hello"].level == "required"
+        assert repl.validation_manager.validation_rules["quit"].level == "none"
 
     def test_introspect_command_groups(self):
         """Test walking Click groups with subcommands."""
@@ -335,12 +335,12 @@ class TestCommandTreeWalking:
 
         repl.cli.add_command(config, name="config")
 
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        assert "config.get" in repl.validation_rules
-        assert "config.set" in repl.validation_rules
-        assert repl.validation_rules["config.get"].level == "required"
-        assert repl.validation_rules["config.set"].level == "required"
+        assert "config.get" in repl.validation_manager.validation_rules
+        assert "config.set" in repl.validation_manager.validation_rules
+        assert repl.validation_manager.validation_rules["config.get"].level == "required"
+        assert repl.validation_manager.validation_rules["config.set"].level == "required"
 
     def test_introspect_stores_rules_correctly(self):
         """Test that rules are stored in dict with correct keys."""
@@ -355,12 +355,12 @@ class TestCommandTreeWalking:
 
         repl.cli.add_command(print_cmd, name="print")
 
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
         # print command is already registered in _register_builtin_commands
         # so it should be in validation_rules
-        assert "print" in repl.validation_rules
-        rule = repl.validation_rules["print"]
+        assert "print" in repl.validation_manager.validation_rules
+        rule = repl.validation_manager.validation_rules["print"]
         assert isinstance(rule, ValidationRule)
         assert rule.level == "required"
 
@@ -380,9 +380,9 @@ class TestAutoValidationExecution:
             pass
 
         repl.cli.add_command(hello, name="hello")
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        result, level = repl._validate_command_auto("hello", ["Alice"])
+        result, level = repl.validation_manager.validate_command("hello", ["Alice"])
 
         assert result.status == "valid"
         assert level == "required"
@@ -399,9 +399,9 @@ class TestAutoValidationExecution:
             pass
 
         repl.cli.add_command(hello, name="hello")
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        result, level = repl._validate_command_auto("hello", [])
+        result, level = repl.validation_manager.validate_command("hello", [])
 
         assert result.status == "invalid"
         assert "required" in result.message.lower() or "missing" in result.message.lower()
@@ -419,9 +419,9 @@ class TestAutoValidationExecution:
             pass
 
         repl.cli.add_command(deploy, name="deploy")
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        result, level = repl._validate_command_auto("deploy", ["staging"])
+        result, level = repl.validation_manager.validate_command("deploy", ["staging"])
 
         assert result.status == "invalid"
         assert level == "required"
@@ -438,9 +438,9 @@ class TestAutoValidationExecution:
             pass
 
         repl.cli.add_command(deploy, name="deploy")
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        result, level = repl._validate_command_auto("deploy", ["dev"])
+        result, level = repl.validation_manager.validate_command("deploy", ["dev"])
 
         assert result.status == "valid"
         assert level == "required"
@@ -457,9 +457,9 @@ class TestAutoValidationExecution:
             pass
 
         repl.cli.add_command(hello, name="hello")
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        result, level = repl._validate_command_auto("hello", [])
+        result, level = repl.validation_manager.validate_command("hello", [])
 
         assert result.status == "valid"
         assert level == "optional"
@@ -475,9 +475,9 @@ class TestAutoValidationExecution:
             pass
 
         repl.cli.add_command(quit, name="quit")
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        result, level = repl._validate_command_auto("quit", [])
+        result, level = repl.validation_manager.validate_command("quit", [])
 
         assert result.status == "valid"
         assert level is None  # none level returns None
@@ -495,9 +495,9 @@ class TestAutoValidationExecution:
             pass
 
         repl.cli.add_command(copy, name="copy")
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        result, level = repl._validate_command_auto("copy", ["file.txt"])
+        result, level = repl.validation_manager.validate_command("copy", ["file.txt"])
 
         assert result.status == "invalid"
         assert level == "required"
@@ -508,13 +508,13 @@ class TestAutoValidationExecution:
 
         repl = REPL(app_name="test")
 
-        result, level = repl._validate_command_auto("unknown", [])
+        result, level = repl.validation_manager.validate_command("unknown", [])
 
         assert result.status == "valid"
         assert level is None
 
     def test_validate_command_wrapper(self):
-        """Test that _validate_command calls _validate_command_auto."""
+        """Test that _validate_command calls validation_manager.validate_command."""
         from cli_repl_kit import REPL
 
         repl = REPL(app_name="test")
@@ -525,7 +525,7 @@ class TestAutoValidationExecution:
             pass
 
         repl.cli.add_command(hello, name="hello")
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
         # Call the wrapper
         result, level = repl._validate_command("hello", ["Alice"])
@@ -546,9 +546,9 @@ class TestAutoValidationExecution:
             pass
 
         repl.cli.add_command(copy, name="copy")
-        repl._introspect_commands()
+        repl.validation_manager.introspect_commands()
 
-        result, level = repl._validate_command_auto("copy", ["file1.txt", "file2.txt"])
+        result, level = repl.validation_manager.validate_command("copy", ["file1.txt", "file2.txt"])
 
         assert result.status == "valid"
         assert level == "required"
