@@ -1,6 +1,8 @@
 # cli-repl-kit
 
-(Still under development and has outstanding defects)
+**Warning** This was produced in hurry with some Vibe Coding sins along the way and therefore functionally it is not bad, but right now it is a nightmare for maintainability and coding standards, it is undergoing refactoring.
+
+(Still under development and has outstanding defects, and critical code structure issues, being AI developed. Refactor underway)
 
 A simple, reusable framework for building interactive command-line tools with both REPL and CLI modes.
 
@@ -17,7 +19,7 @@ A simple, reusable framework for building interactive command-line tools with bo
 ✅ **No REPL code to write** - The framework handles the interactive loop for you
 ✅ **Automatic command discovery** - Just declare your commands, no manual registration
 ✅ **Tab completion** - Claude Code style `/` prefix completion built-in
-✅ **Beautiful output** - Rich console styling with colors and themes (currently ANSI only)
+✅ **Beautiful output** - Rich console styling with colors and themes using `Rich`
 ✅ **Dual-mode by default** - REPL and CLI modes work automatically
 ✅ **Plugin-based** - Add commands without modifying framework code
 ✅ **Automatic validation** - Validation based on Click decorators, no manual methods needed
@@ -162,7 +164,7 @@ My CLI App v0.1.0
 
 That's it! You now have a working CLI/REPL app with tab completion and styled output.
 
-## Core Concepts (Explained Simply)
+## Core Concepts
 
 ### 1. CommandPlugin
 
@@ -575,7 +577,7 @@ The built-in `/status` and `/info` commands support ANSI escape codes from the c
 
 ### Automatic Validation
 
-**NEW!** Validation is now completely automatic based on Click decorators. No manual validation methods needed!
+Validation is now completely automatic based on Click decorators. No manual validation methods needed!
 
 #### How It Works
 
@@ -664,6 +666,19 @@ Validation level is automatically determined:
 - **None** - Commands with no parameters
 
 No manual `get_validation_config()` or `validate_command()` methods needed!
+
+### Mouse Selection in Output Area
+
+You can now select and copy text from the output area using your mouse.
+
+#### How to Use
+
+1. Press **Ctrl+O** to toggle focus to the output area
+2. Click and drag to select text with your mouse
+3. Copy selected text with **Ctrl+C** or **Ctrl+Shift+C**
+4. Press **Ctrl+O** again (or click the input area) to return focus
+
+This is especially useful for copying command output, error messages, or long text blocks.
 
 ### Subcommands with Clean Formatting
 
@@ -826,8 +841,8 @@ class StyledCommandsPlugin(CommandPlugin):
 
 > /table
 ● /table
-╭─────────────────────────────────╮
-│         User Data               │
+╭────────────────────────────────╮
+│         User Data              │
 ├─────────┬──────────┬───────────┤
 │ Name    │ Status   │ Score     │
 ├─────────┼──────────┼───────────┤
