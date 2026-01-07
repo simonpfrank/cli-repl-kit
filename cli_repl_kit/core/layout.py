@@ -3,9 +3,10 @@
 This module provides layout-related classes and utilities for building
 the REPL user interface with prompt_toolkit.
 """
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable
 
 from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.formatted_text import StyleAndTextTuples
 from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 
 
@@ -54,7 +55,7 @@ class ConditionalScrollbarMargin(Margin):
 
     def create_margin(
         self, window_render_info: Any, width: int, height: int
-    ) -> Callable[..., List[Tuple[str, str]]]:
+    ) -> StyleAndTextTuples:
         """Render scrollbar only if at max lines.
 
         Args:
@@ -63,12 +64,12 @@ class ConditionalScrollbarMargin(Margin):
             height: Available height for the margin
 
         Returns:
-            Callable that returns formatted text for the margin
+            Formatted text for the margin
         """
         line_count = (
             max(1, self.buffer.text.count("\n") + 1) if self.buffer.text else 1
         )
         if line_count >= self.max_lines:
             return self.scrollbar.create_margin(window_render_info, width, height)
-        # Return a function that returns empty formatted text (accept any args)
-        return lambda *args, **kwargs: []
+        # Return empty formatted text
+        return []

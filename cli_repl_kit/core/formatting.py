@@ -3,9 +3,9 @@
 This module provides functions for converting between prompt_toolkit's FormattedText
 structure and ANSI-escaped strings, as well as lexing ANSI codes back into styled text.
 """
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, List, Tuple, cast
 
-from prompt_toolkit.formatted_text import ANSI
+from prompt_toolkit.formatted_text import ANSI, StyleAndTextTuples
 from prompt_toolkit.lexers import Lexer
 
 
@@ -70,7 +70,7 @@ class ANSILexer(Lexer):
     them back into prompt_toolkit's FormattedText structure for display.
     """
 
-    def lex_document(self, document) -> Callable[[int], List[Tuple[str, str]]]:
+    def lex_document(self, document) -> Callable[[int], StyleAndTextTuples]:
         """Return a function that returns styled fragments for a line.
 
         Args:
@@ -87,7 +87,7 @@ class ANSILexer(Lexer):
         """
         lines = document.lines
 
-        def get_line(lineno: int) -> List[Tuple[str, str]]:
+        def get_line(lineno: int) -> StyleAndTextTuples:
             """Get styled fragments for a specific line number.
 
             Args:
@@ -99,7 +99,7 @@ class ANSILexer(Lexer):
             if lineno < len(lines):
                 line = lines[lineno]
                 # Parse ANSI codes and return FormattedText
-                return list(ANSI(line).__pt_formatted_text__())
+                return ANSI(line).__pt_formatted_text__()
             return []
 
         return get_line

@@ -40,14 +40,17 @@ class OutputCapture(io.StringIO):
         self.output_callback = output_callback
         self.config = config
 
-    def write(self, text: str) -> None:
+    def write(self, text: str) -> int:
         """Capture text and send to output.
 
         Args:
             text: Text to capture
+
+        Returns:
+            Number of characters written
         """
         if not text or text == "\n":
-            return
+            return 0
 
         # Add to output with appropriate styling
         if self.stream_type == "stderr":
@@ -56,6 +59,8 @@ class OutputCapture(io.StringIO):
         else:
             # Default (no style) for stdout
             self.output_callback([("", text)])
+
+        return len(text)
 
     def flush(self) -> None:
         """Flush (no-op for our purposes)."""

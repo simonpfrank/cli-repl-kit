@@ -81,8 +81,8 @@ class TestConditionalScrollbarMargin:
         width = margin.get_width(MockUIContent())
         assert width == 0
 
-    def test_create_margin_below_max_returns_empty_function(self):
-        """Test create_margin returns empty function when below max."""
+    def test_create_margin_below_max_returns_empty_list(self):
+        """Test create_margin returns empty list when below max."""
         buffer = Buffer()
         buffer.text = "Line 1\nLine 2"  # 2 lines
         margin = ConditionalScrollbarMargin(buffer, max_lines=10)
@@ -92,11 +92,8 @@ class TestConditionalScrollbarMargin:
 
         result = margin.create_margin(MockWindowRenderInfo(), width=1, height=10)
 
-        # Should return a callable
-        assert callable(result)
-
-        # Calling it should return empty list
-        assert result() == []
+        # Should return an empty list
+        assert result == []
 
     def test_create_margin_at_max_returns_scrollbar_margin(self):
         """Test create_margin returns scrollbar margin at max lines."""

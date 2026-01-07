@@ -97,7 +97,7 @@ class REPL:
             self.config = Config.load(str(default_config), app_name=app_name)
 
         # Initialize validation system
-        self.plugins = []  # List of loaded plugin instances
+        self.plugins: List[Any] = []  # List of loaded plugin instances
         self.validation_rules: Dict[str, ValidationRule] = (
             {}
         )  # Maps command_path -> ValidationRule
