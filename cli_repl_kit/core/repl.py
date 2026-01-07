@@ -1191,10 +1191,6 @@ class REPL:
                         ]
                     )
 
-            # Reset scroll lock on new command submission
-            state["user_scrolled_output"] = False
-            state["output_scroll_offset"] = 0
-
             # Block execution if validation failed with required level
             if should_block:
                 # Don't add to history, don't clear buffer, don't execute
@@ -1248,14 +1244,14 @@ class REPL:
                         subcmd = cmd.commands[cmd_args[0]]
                         subcmd_args = cmd_args[1:]
                         self._execute_click_command(
-                            subcmd, subcmd_args, state, add_output_line
+                            subcmd, subcmd_args, state, append_to_output_buffer
                         )
                     else:
                         # Just the group name, no subcommand
                         append_to_output_buffer([("", "")])
                 else:
                     # Regular command
-                    self._execute_click_command(cmd, cmd_args, state, add_output_line)
+                    self._execute_click_command(cmd, cmd_args, state, append_to_output_buffer)
             else:
                 append_to_output_buffer([("red", f"Unknown command: {cmd_name}")])
 
@@ -1281,8 +1277,8 @@ class REPL:
         app.invalidate()
 
         # Global stdout/stderr capture
-        stdout_capture = OutputCapture("stdout", add_output_line, self.config)
-        stderr_capture = OutputCapture("stderr", add_output_line, self.config)
+        stdout_capture = OutputCapture("stdout", append_to_output_buffer, self.config)
+        stderr_capture = OutputCapture("stderr", append_to_output_buffer, self.config)
 
         # Redirect global stdout/stderr
         original_stdout = sys.stdout
@@ -1304,13 +1300,9 @@ class REPL:
             cmd: The Click command to execute
             args: Command arguments
             state: State dictionary
-            add_output_line: Optional callback to add output with auto-scroll
+            add_output_line: Callback to add output with auto-scroll
         """
-        # Fallback to direct append if no callback provided
-        if add_output_line is None:
-
-            def append_to_output_buffer(line):
-                state["output_lines"].append(line)
+        append_to_output_buffer = add_output_line
 
         stdout_buf = io.StringIO()
         stderr_buf = io.StringIO()
