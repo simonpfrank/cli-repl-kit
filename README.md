@@ -1,10 +1,11 @@
 # cli-repl-kit
 
-**Warning** This was produced in hurry with some Vibe Coding sins along the way and therefore functionally it is not bad, but right now it is a nightmare for maintainability and coding standards, it is undergoing refactoring.
+A reusable framework for building interactive command-line tools with both REPL and CLI modes.
 
-(Still under development and has outstanding defects, and critical code structure issues, being AI developed. Refactor underway)
-
-A simple, reusable framework for building interactive command-line tools with both REPL and CLI modes.
+**Note:** This entire app was built in Claude Code with little or no manual coding as a practise session on AI coding and to use in other scripts such as agents.
+It has not yet been possible to test everything, so treat as an alpha and some of Claude's claims have not yet been verified.
+The project did become slop part way through, therefore significant refactoring was then done based on the code review in the docs folder. The sad audit trail of clearing it up
+is all available in the docs folder. Significant changes to my Claude.md have been made to prevent this happening in future, it remains to be seen whether they will work but the original root cause was the meat in the architecture (me).
 
 ## What is cli-repl-kit?
 
