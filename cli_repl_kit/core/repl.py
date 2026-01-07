@@ -383,7 +383,7 @@ class REPL:
     # API methods for status and info lines
 
     def _substitute_ansi_codes(self, text: str) -> str:
-        """Substitute ${ansi.COLOR} patterns with ANSI escape codes from config.
+        r"""Substitute ${ansi.COLOR} patterns with ANSI escape codes from config.
 
         Args:
             text: Text containing ${ansi.COLOR} patterns

@@ -20,13 +20,25 @@ class CommandExecutor:
     """Handles command execution and formatting.
 
     Manages command display formatting, validation integration,
-    and Click command execution with output capture.
+    and Click command execution with output capture. Coordinates
+    between user input, validation, and Click command execution.
 
     Attributes:
         config: REPL configuration
         cli: Click CLI group
         validate_callback: Callback for command validation
-        append_output_callback: Callback to add output lines
+        append_output: Callback to add output lines
+
+    Example:
+        >>> from unittest.mock import Mock
+        >>> config = Config.load("config.yaml")
+        >>> cli = click.Group()
+        >>> validate_cb = Mock(return_value=(ValidationResult(status="valid"), None))
+        >>> append_cb = Mock()
+        >>> executor = CommandExecutor(config, cli, validate_cb, append_cb)
+        >>> lines = executor.format_command_display("/hello world")
+        >>> len(lines) > 0
+        True
     """
 
     def __init__(
@@ -41,8 +53,13 @@ class CommandExecutor:
         Args:
             config: REPL configuration
             cli: Click CLI group
-            validate_callback: Function to validate commands
-            append_output_callback: Function to append output lines
+            validate_callback: Function to validate commands before execution
+            append_output_callback: Function to append formatted output lines
+
+        Example:
+            >>> executor = CommandExecutor(config, cli, validate, append)
+            >>> executor.config == config
+            True
         """
         self.config = config
         self.cli = cli
@@ -54,13 +71,25 @@ class CommandExecutor:
     ) -> List[Any]:
         """Format command for display with icons and styling.
 
+        Creates formatted text representation of a command with appropriate
+        icons (✓, ✗, ⚠) and color styling based on success/error/warning state.
+
         Args:
             command_text: The full command text (with or without /)
             has_error: Whether the command resulted in an error
             has_warning: Whether the command has a warning
 
         Returns:
-            List of lines to display (each line is FormattedText)
+            List of formatted text lines, each a list of (style, text) tuples
+
+        Example:
+            >>> executor = CommandExecutor(config, cli, validate_cb, append_cb)
+            >>> lines = executor.format_command_display("/hello world")
+            >>> len(lines) >= 1
+            True
+            >>> error_lines = executor.format_command_display("/bad", has_error=True)
+            >>> any("✗" in str(line) for line in error_lines)
+            True
         """
         # Remove leading / if present
         if command_text.startswith("/"):

@@ -15,11 +15,28 @@ class ValidationManager:
     """Manages command validation rules and validation execution.
 
     Extracts validation rules from Click command introspection and
-    provides validation for commands before execution.
+    provides validation for commands before execution. Automatically
+    analyzes Click commands to determine required arguments, optional
+    parameters, and choice constraints.
 
     Attributes:
         cli: Click CLI group containing commands
         validation_rules: Dict mapping command_path -> ValidationRule
+
+    Example:
+        >>> import click
+        >>> cli = click.Group()
+        >>>
+        >>> @cli.command()
+        >>> @click.argument("name", required=True)
+        >>> def hello(name):
+        ...     print(f"Hello {name}")
+        >>>
+        >>> manager = ValidationManager(cli)
+        >>> manager.introspect_commands()
+        >>> result, level = manager.validate_command("hello", ["World"])
+        >>> print(result.status)
+        valid
     """
 
     def __init__(self, cli: click.Group):
@@ -27,12 +44,35 @@ class ValidationManager:
 
         Args:
             cli: Click CLI group to introspect for validation rules
+
+        Example:
+            >>> import click
+            >>> cli = click.Group()
+            >>> manager = ValidationManager(cli)
+            >>> manager.cli == cli
+            True
         """
         self.cli = cli
         self.validation_rules: Dict[str, ValidationRule] = {}
 
     def introspect_commands(self) -> None:
-        """Walk command tree and extract validation rules for all commands."""
+        """Walk command tree and extract validation rules for all commands.
+
+        Analyzes all commands and subcommands in the CLI group, extracting
+        their parameter requirements and storing validation rules for later use.
+
+        Example:
+            >>> import click
+            >>> cli = click.Group()
+            >>> @cli.command()
+            >>> @click.argument("file", required=True)
+            >>> def read(file):
+            ...     pass
+            >>> manager = ValidationManager(cli)
+            >>> manager.introspect_commands()
+            >>> "read" in manager.validation_rules
+            True
+        """
         for cmd_name, cmd in self.cli.commands.items():
             if isinstance(cmd, click.Group):
                 # Handle group with subcommands
@@ -50,12 +90,28 @@ class ValidationManager:
     ) -> ValidationRule:
         """Extract validation rule from Click command.
 
+        Analyzes a Click command's parameters to build a ValidationRule that
+        captures argument requirements, option constraints, and type information.
+
         Args:
             cmd: Click command object
             cmd_path: Full command path (e.g., "config.set" for subcommands)
 
         Returns:
-            ValidationRule with inferred constraints
+            ValidationRule with inferred constraints from command parameters
+
+        Example:
+            >>> import click
+            >>> @click.command()
+            >>> @click.argument("env", type=click.Choice(["dev", "prod"]))
+            >>> def deploy(env):
+            ...     pass
+            >>> manager = ValidationManager(click.Group())
+            >>> rule = manager._extract_validation_rule(deploy, "deploy")
+            >>> rule.level
+            'required'
+            >>> "env" in rule.choice_params
+            True
         """
         rule = ValidationRule(
             level="none",
@@ -139,12 +195,34 @@ class ValidationManager:
     ) -> Tuple[ValidationResult, Optional[str]]:
         """Validate command using auto-generated rules.
 
+        Uses Click's native validation by attempting to parse arguments
+        against the command's expected parameters. Returns validation
+        results without executing the command.
+
         Args:
             cmd_path: Command path (e.g., "deploy" or "config.set")
             cmd_args: Raw argument list from user
 
         Returns:
-            Tuple of (ValidationResult, validation_level or None)
+            Tuple of (ValidationResult, validation_level or None).
+            ValidationResult has status "valid" or "invalid" and optional message.
+            validation_level is "required", "optional", or None.
+
+        Example:
+            >>> import click
+            >>> cli = click.Group()
+            >>> @cli.command()
+            >>> @click.argument("name", required=True)
+            >>> def greet(name):
+            ...     print(f"Hello {name}")
+            >>> manager = ValidationManager(cli)
+            >>> manager.introspect_commands()
+            >>> result, level = manager.validate_command("greet", ["Alice"])
+            >>> result.status
+            'valid'
+            >>> result, level = manager.validate_command("greet", [])
+            >>> result.status
+            'invalid'
         """
         # Check if command has validation rule
         if cmd_path not in self.validation_rules:

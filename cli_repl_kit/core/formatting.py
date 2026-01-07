@@ -12,7 +12,7 @@ from prompt_toolkit.lexers import Lexer
 def formatted_text_to_ansi_string(
     formatted_text: List[Tuple[str, str]], config: Any
 ) -> str:
-    """Convert FormattedText list to ANSI-escaped string.
+    r"""Convert FormattedText list to ANSI-escaped string.
 
     Takes a list of (style, text) tuples and converts them to a string with
     ANSI escape codes for terminal display. Styles are looked up in the config's
@@ -28,7 +28,7 @@ def formatted_text_to_ansi_string(
     Example:
         >>> formatted_text = [("red", "Error: "), ("", "Something failed")]
         >>> result = formatted_text_to_ansi_string(formatted_text, config)
-        >>> # Returns: "\\x1b[31mError: \\x1b[0mSomething failed"
+        >>> # Returns: "\x1b[31mError: \x1b[0mSomething failed"
     """
     if not formatted_text:
         return ""
@@ -71,7 +71,7 @@ class ANSILexer(Lexer):
     """
 
     def lex_document(self, document) -> Callable[[int], StyleAndTextTuples]:
-        """Return a function that returns styled fragments for a line.
+        r"""Return a function that returns styled fragments for a line.
 
         Args:
             document: prompt_toolkit Document
@@ -81,7 +81,7 @@ class ANSILexer(Lexer):
 
         Example:
             >>> lexer = ANSILexer()
-            >>> doc = Document("\\x1b[31mRed text\\x1b[0m")
+            >>> doc = Document("\x1b[31mRed text\x1b[0m")
             >>> get_line = lexer.lex_document(doc)
             >>> fragments = get_line(0)  # Returns styled fragments
         """

@@ -1,6 +1,4 @@
-"""
-Custom auto-completion for REPL (Claude Code style).
-"""
+"""Custom auto-completion for REPL (Claude Code style)."""
 
 from typing import Any, Dict, Iterable, Optional
 
