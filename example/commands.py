@@ -33,9 +33,9 @@ class HelloCommandsPlugin(CommandPlugin):
         # hello
         @click.command()
         @click.argument("text", nargs=-1, required=True)
-        def hello(message):
+        def hello(text):
             """Say hello with custom text."""
-            message = " ".join(message)
+            message = " ".join(text)
             print(f"hello - {message}")
 
         # list files
@@ -86,9 +86,6 @@ class HelloCommandsPlugin(CommandPlugin):
         @click.argument("message", nargs=-1)
         def echo(message):
             """Echo a message. DEPRECATED: Use '/print' instead."""
-            """click.echo(
-                "WARNING: The 'echo' command is deprecated, use '/print' instead"
-            )"""
             print(" ".join(message))
 
         @click.command()
