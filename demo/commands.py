@@ -1,6 +1,8 @@
 """Commands for Hello World demo app."""
 
+import sys
 import subprocess
+from pathlib import Path
 
 import click
 
@@ -44,12 +46,33 @@ class HelloCommandsPlugin(CommandPlugin):
         def list_files(path):
             """List files in the specified directory (default: current directory)."""
             # Use current directory if no path provided
-            target_path = " ".join(path) if path else "."
+            target_path_str = " ".join(path) if path else "."
 
             try:
-                # Run ls command and capture output
+                # Validate path to prevent path traversal attacks
+                target_path = Path(target_path_str).resolve()
+                cwd = Path.cwd().resolve()
+
+                # Security: Prevent path traversal outside current directory
+                if not str(target_path).startswith(str(cwd)):
+                    print(f"Error: Path '{target_path_str}' is outside current directory")
+                    print(f"Access is restricted to: {cwd}")
+                    return
+
+                # Verify path exists
+                if not target_path.exists():
+                    print(f"Error: Path '{target_path_str}' does not exist")
+                    return
+
+                # Cross-platform command selection
+                if sys.platform == "win32":
+                    cmd = ["dir", "/W", str(target_path)]
+                else:
+                    cmd = ["ls", "-la", str(target_path)]
+
+                # Run platform-specific command
                 result = subprocess.run(
-                    ["ls", "-la", target_path],
+                    cmd,
                     capture_output=True,
                     text=True,
                     check=True,
@@ -59,7 +82,10 @@ class HelloCommandsPlugin(CommandPlugin):
             except subprocess.CalledProcessError as e:
                 print(f"Error listing files: {e.stderr}")
             except FileNotFoundError:
-                print("Error: 'ls' command not found")
+                cmd_name = "dir" if sys.platform == "win32" else "ls"
+                print(f"Error: '{cmd_name}' command not found")
+            except (ValueError, OSError) as e:
+                print(f"Error: Invalid path - {e}")
 
         # sub menus
         @click.group()
@@ -89,10 +115,11 @@ class HelloCommandsPlugin(CommandPlugin):
             print(" ".join(message))
 
         @click.command()
-        @click.argument("how_do_you_want_be_greeted")
-        def greet(how_do_you_want_be_greeted):
-            """Greet someone (no validation needed - has default)."""
-            print(f"Hello, {how_do_you_want_be_greeted}!")
+        @click.argument("greeting", nargs=-1, required=True)
+        def greet(greeting):
+            """Greet someone with custom greeting text."""
+            message = " ".join(greeting)
+            print(f"Hello, {message}!")
 
         # deploy
         @click.command()
@@ -105,11 +132,49 @@ class HelloCommandsPlugin(CommandPlugin):
             print(f"Deploying to {environment}...")
             print(f"Deployment to {environment} successful!")
 
+        # status - for setting the status line
+        @click.command()
+        @click.argument("text", nargs=-1, required=False)
+        def status(text):
+            """Set or clear the status line.
+
+            Examples:
+                /status Processing data...
+                /status
+            """
+            if text:
+                message = " ".join(text)
+                print(f"[Status] {message}")
+                # TODO: When REPL context is available, call repl.set_status()
+            else:
+                print("[Status] Cleared")
+                # TODO: When REPL context is available, call repl.clear_status()
+
+        # info - for setting the info line
+        @click.command()
+        @click.argument("text", nargs=-1, required=False)
+        def info(text):
+            """Set or clear the info line.
+
+            Examples:
+                /info Ready to process
+                /info
+            """
+            if text:
+                message = " ".join(text)
+                print(f"[Info] {message}")
+                # TODO: When REPL context is available, call repl.set_info()
+            else:
+                print("[Info] Cleared")
+                # TODO: When REPL context is available, call repl.clear_info()
+
         # Register commands
         cli.add_command(deploy, name="deploy")
         cli.add_command(echo, name="echo")
         cli.add_command(greet, name="greet")
-        cli.add_command(quit, name="quit")
         cli.add_command(hello, name="hello")
+        cli.add_command(info, name="info")
         cli.add_command(list_files, name="list_files")
+        cli.add_command(quit, name="quit")
+        cli.add_command(status, name="status")
         cli.add_command(sub, name="sub")

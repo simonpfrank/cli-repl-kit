@@ -9,7 +9,7 @@ def main():
     """Start the Hello World CLI/REPL.
 
     Supports both modes:
-    - CLI mode: When called with arguments (e.g., `python -m example.cli hello World`)
+    - CLI mode: When called with arguments (e.g., `python -m demo.cli hello World`)
     - REPL mode: When called without arguments (enters interactive mode)
     """
     repl = REPL(app_name="Hello World Demo")

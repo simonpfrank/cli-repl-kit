@@ -235,9 +235,10 @@ class ValidationManager:
             return (ValidationResult(status="valid"), None)
 
         # Use Click's native validation by attempting to parse args
+        # IMPORTANT: parse_args modifies the list, so pass a copy
         try:
             ctx = click.Context(rule.click_command)
-            rule.click_command.parse_args(ctx, cmd_args)
+            rule.click_command.parse_args(ctx, cmd_args.copy())
             return (ValidationResult(status="valid"), rule.level)
 
         except click.exceptions.MissingParameter as e:

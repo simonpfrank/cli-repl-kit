@@ -63,6 +63,7 @@ class LayoutBuilder:
                     self._create_divider_window(),
                     self._create_info_window(),
                     self._create_menu_window(input_buffer),
+                    self._create_spacer_window(),
                 ]
             )
         )
@@ -179,6 +180,17 @@ class LayoutBuilder:
             content=FormattedTextControl(text=get_divider_text),
         )
 
+    def _create_spacer_window(self) -> Window:
+        """Create empty spacer line below menu.
+
+        Returns:
+            Window with single empty line for spacing
+        """
+        return Window(
+            height=D(min=1, max=1, preferred=1),
+            content=FormattedTextControl(text=lambda: [("", "")]),
+        )
+
     def _get_input_height(self, input_buffer: Buffer) -> D:
         """Calculate input height based on buffer content.
 
@@ -207,22 +219,19 @@ class LayoutBuilder:
             return D(preferred=0, min=0, max=0)
 
     def _get_menu_height(self) -> D:
-        """Calculate menu height dynamically.
+        """Calculate menu height - always uses configured height.
 
-        Shows full menu when slash command is active with completions,
-        or when keeping visible after execution.
+        The menu always occupies its configured height to prevent layout
+        shifting. Content visibility is controlled by the rendering function,
+        not by collapsing the window height.
 
         Returns:
-            Dimension for menu window height
+            Dimension for menu window height (always configured value)
         """
         menu_preferred_height = self.config.windows.menu.height
 
-        if (
-            self.state.slash_command_active and self.state.completions
-        ) or self.state.menu_keep_visible:
-            return D(preferred=menu_preferred_height)
-        else:
-            return D(preferred=0, min=0)
+        # Always use configured height - menu content controls visibility
+        return D(preferred=menu_preferred_height)
 
     def _render_status(self) -> StyleAndTextTuples:
         """Render status line content.

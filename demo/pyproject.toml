@@ -11,10 +11,10 @@ dependencies = [
 ]
 
 [project.scripts]
-hello-world = "example.cli:main"
+hello-demo = "demo.cli:main"
 
 [project.entry-points."repl.commands"]
-hello = "example.commands:HelloCommandsPlugin"
+hello_demo = "demo.commands:HelloCommandsPlugin"
 
 [tool.setuptools.packages.find]
 where = ["."]

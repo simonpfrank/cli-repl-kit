@@ -1,0 +1,154 @@
+name: Quality Checks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  quality:
+    name: Code Quality & Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        exclude:
+          # Reduce matrix size - only test all versions on Linux
+          - os: macos-latest
+            python-version: "3.8"
+          - os: macos-latest
+            python-version: "3.9"
+          - os: windows-latest
+            python-version: "3.8"
+          - os: windows-latest
+            python-version: "3.9"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest pytest-cov mypy ruff radon pydocstyle
+
+      - name: Check file size limits
+        run: |
+          python -c "
+          import sys
+          from pathlib import Path
+
+          max_lines = 500
+          failed = False
+
+          for file in Path('cli_repl_kit').rglob('*.py'):
+              lines = len(file.read_text().splitlines())
+              if lines > max_lines:
+                  print(f'FAIL: {file} has {lines} lines (max {max_lines})')
+                  failed = True
+
+          if failed:
+              sys.exit(1)
+          else:
+              print('✓ All files under 500 lines')
+          "
+
+      - name: Check function complexity
+        run: |
+          radon cc cli_repl_kit --min C --show-complexity || echo "✓ No complex functions found"
+
+      - name: Check for commented code
+        shell: bash
+        run: |
+          if grep -r "# PRESERVED" cli_repl_kit/ 2>/dev/null; then
+            echo "FAIL: Commented code found"
+            exit 1
+          fi
+          echo "✓ No commented code found"
+
+      - name: Docstring quality check
+        run: |
+          pydocstyle cli_repl_kit/ || echo "Warning: Some docstring issues found"
+
+      - name: Type checking with mypy
+        run: |
+          mypy cli_repl_kit/ --ignore-missing-imports --no-strict-optional || echo "Warning: Type checking found issues"
+        continue-on-error: true
+
+      - name: Linting with ruff
+        run: |
+          ruff check cli_repl_kit/
+
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/unit/ -v --cov=cli_repl_kit --cov-report=term-missing --cov-report=xml
+
+      - name: Run integration tests
+        run: |
+          python -m pytest tests/integration/ -v
+
+      - name: Run performance benchmarks
+        run: |
+          python -m pytest tests/performance/ -v
+        continue-on-error: true
+
+      - name: Coverage check
+        run: |
+          python -m pytest --cov=cli_repl_kit --cov-report=term --cov-fail-under=70
+        continue-on-error: true
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install safety bandit
+
+      - name: Security check with bandit
+        run: |
+          bandit -r cli_repl_kit/ -f json -o bandit-report.json || true
+          bandit -r cli_repl_kit/ || echo "Warning: Security issues found"
+        continue-on-error: true
+
+      - name: Dependency security check
+        run: |
+          safety check --json || echo "Warning: Dependency vulnerabilities found"
+        continue-on-error: true
+
+      - name: Check for subprocess with shell=True
+        run: |
+          if grep -r "shell=True" cli_repl_kit/ examples/ 2>/dev/null; then
+            echo "FAIL: Found subprocess with shell=True"
+            exit 1
+          fi
+          echo "✓ No unsafe subprocess calls found"

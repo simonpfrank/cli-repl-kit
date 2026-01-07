@@ -70,14 +70,33 @@ def main():
     @repl.cli.command()
     @click.argument("command", nargs=-1, required=True)
     def shell(command):
-        """Execute a shell command (demonstrates subprocess)."""
+        """Execute a shell command (demonstrates subprocess).
+
+        WARNING: This command executes arbitrary system commands.
+        In production, you should whitelist allowed commands or add
+        additional security checks.
+        """
         cmd = list(command)
+
+        # Security warning for demonstration purposes
+        if not cmd:
+            print("Error: No command specified")
+            return
+
+        # Optional: Add command whitelist for production use
+        # DANGEROUS_COMMANDS = ["rm", "del", "format", "mkfs"]
+        # if cmd[0] in DANGEROUS_COMMANDS:
+        #     print(f"Error: Command '{cmd[0]}' is not allowed")
+        #     return
+
         try:
+            # Note: shell=False ensures no shell injection possible
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                check=False,
             )
             if result.stdout:
                 print(result.stdout)
@@ -89,8 +108,8 @@ def main():
             print("Error: Command timed out after 10 seconds")
         except FileNotFoundError:
             print(f"Error: Command not found: {cmd[0]}")
-        except Exception as e:
-            print(f"Error: {e}")
+        except (OSError, ValueError) as e:
+            print(f"Error executing command: {e}")
 
     @repl.cli.command()
     @click.argument("text", nargs=-1, required=True)

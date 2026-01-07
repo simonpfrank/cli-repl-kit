@@ -9,7 +9,7 @@ class TestCLIModeValidation:
     def test_cli_missing_required_arg(self):
         """Test CLI blocks on missing required argument."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "hello"],
+            [sys.executable, "-m", "demo.cli", "hello"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -23,7 +23,7 @@ class TestCLIModeValidation:
     def test_cli_valid_required_arg(self):
         """Test CLI succeeds with valid required argument."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "hello", "World"],
+            [sys.executable, "-m", "demo.cli", "hello", "World"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -35,7 +35,7 @@ class TestCLIModeValidation:
     def test_cli_invalid_choice(self):
         """Test CLI blocks on invalid choice value."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "deploy", "invalid"],
+            [sys.executable, "-m", "demo.cli", "deploy", "invalid"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -49,7 +49,7 @@ class TestCLIModeValidation:
     def test_cli_valid_choice_dev(self):
         """Test CLI succeeds with valid choice value 'dev'."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "deploy", "dev"],
+            [sys.executable, "-m", "demo.cli", "deploy", "dev"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -62,7 +62,7 @@ class TestCLIModeValidation:
     def test_cli_valid_choice_staging(self):
         """Test CLI succeeds with valid choice value 'staging'."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "deploy", "staging"],
+            [sys.executable, "-m", "demo.cli", "deploy", "staging"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -74,7 +74,7 @@ class TestCLIModeValidation:
     def test_cli_valid_choice_prod_shows_warning(self):
         """Test CLI succeeds with 'prod' and shows warning."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "deploy", "prod"],
+            [sys.executable, "-m", "demo.cli", "deploy", "prod"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -88,7 +88,7 @@ class TestCLIModeValidation:
     def test_cli_subcommand_missing_arg(self):
         """Test CLI blocks on subcommand missing required argument."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "sub", "red"],
+            [sys.executable, "-m", "demo.cli", "sub", "red"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -101,7 +101,7 @@ class TestCLIModeValidation:
     def test_cli_subcommand_with_arg(self):
         """Test CLI succeeds with subcommand and required argument."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "sub", "red", "test message"],
+            [sys.executable, "-m", "demo.cli", "sub", "red", "test message"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -113,7 +113,7 @@ class TestCLIModeValidation:
     def test_cli_optional_arg_empty(self):
         """Test CLI succeeds with optional argument empty."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "list_files"],
+            [sys.executable, "-m", "demo.cli", "list_files"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -125,7 +125,7 @@ class TestCLIModeValidation:
     def test_cli_command_no_params(self):
         """Test CLI succeeds with command that has no parameters."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "quit"],
+            [sys.executable, "-m", "demo.cli", "quit"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -137,7 +137,7 @@ class TestCLIModeValidation:
     def test_cli_error_message_format(self):
         """Test that CLI error messages are shown in stderr."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "hello"],
+            [sys.executable, "-m", "demo.cli", "hello"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -153,7 +153,7 @@ class TestCLIModeValidation:
         """Test CLI validation for built-in print command."""
         # Print command requires text argument
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "print"],
+            [sys.executable, "-m", "demo.cli", "print"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -166,7 +166,7 @@ class TestCLIModeValidation:
     def test_cli_built_in_print_command_with_text(self):
         """Test CLI succeeds with print command and text."""
         result = subprocess.run(
-            [sys.executable, "-m", "example.cli", "print", "test", "message"],
+            [sys.executable, "-m", "demo.cli", "print", "test", "message"],
             capture_output=True,
             text=True,
             timeout=5,

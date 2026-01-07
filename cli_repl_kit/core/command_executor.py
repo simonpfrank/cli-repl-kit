@@ -309,16 +309,34 @@ class CommandExecutor:
             ctx = click.Context(cmd)
 
             with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
-                # For commands with nargs=-1, pass args as tuple
+                # Map args to Click parameter names (ctx.invoke requires kwargs)
                 if hasattr(cmd, "params"):
-                    for param in cmd.params:
-                        if isinstance(param, click.Argument) and param.nargs == -1:
-                            ctx.invoke(cmd, **{param.name: tuple(args)})
-                            break
+                    # Get all argument parameters (not options)
+                    arguments = [
+                        p for p in cmd.params if isinstance(p, click.Argument)
+                    ]
+
+                    if arguments:
+                        kwargs = {}
+                        arg_idx = 0
+
+                        for param in arguments:
+                            if param.nargs == -1:
+                                # This parameter takes all remaining args as tuple
+                                kwargs[param.name] = tuple(args[arg_idx:])
+                                break
+                            else:
+                                # This parameter takes 1 arg (nargs=1 is default)
+                                if arg_idx < len(args):
+                                    kwargs[param.name] = args[arg_idx]
+                                    arg_idx += 1
+
+                        ctx.invoke(cmd, **kwargs)
                     else:
-                        ctx.invoke(cmd, *args)
+                        # No arguments, invoke without args
+                        ctx.invoke(cmd)
                 else:
-                    ctx.invoke(cmd, *args)
+                    ctx.invoke(cmd)
         except SystemExit:
             pass
         except click.exceptions.MissingParameter as e:
