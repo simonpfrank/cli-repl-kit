@@ -2,6 +2,7 @@
 
 import io
 import sys
+import re
 from contextlib import redirect_stderr, redirect_stdout
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -147,14 +148,14 @@ class ConditionalScrollbarMargin(Margin):
 
     def get_width(self, ui_content):
         """Return width only if condition is met."""
-        line_count = max(1, self.buffer.text.count('\n') + 1) if self.buffer.text else 1
+        line_count = max(1, self.buffer.text.count("\n") + 1) if self.buffer.text else 1
         if line_count >= self.max_lines:
             return self.scrollbar.get_width(ui_content)
         return 0
 
     def create_margin(self, window_render_info, width, height):
         """Render scrollbar only if at max lines."""
-        line_count = max(1, self.buffer.text.count('\n') + 1) if self.buffer.text else 1
+        line_count = max(1, self.buffer.text.count("\n") + 1) if self.buffer.text else 1
         if line_count >= self.max_lines:
             return self.scrollbar.create_margin(window_render_info, width, height)
         # Return a function that returns empty formatted text (accept any args)
@@ -220,6 +221,7 @@ class REPL:
         # Load config
         import cli_repl_kit
         from cli_repl_kit.core.config import Config
+
         if config_path:
             self.config = Config.load(config_path, app_name=app_name)
         else:
@@ -229,7 +231,9 @@ class REPL:
 
         # Initialize validation system
         self.plugins = []  # List of loaded plugin instances
-        self.validation_rules: Dict[str, ValidationRule] = {}  # Maps command_path -> ValidationRule
+        self.validation_rules: Dict[str, ValidationRule] = (
+            {}
+        )  # Maps command_path -> ValidationRule
 
         # Discover and load plugins
         self._load_plugins()
@@ -287,7 +291,9 @@ class REPL:
         # AUTO-GENERATE validation rules from Click commands
         self._introspect_commands()
 
-    def _extract_validation_rule(self, cmd: click.Command, cmd_path: str) -> ValidationRule:
+    def _extract_validation_rule(
+        self, cmd: click.Command, cmd_path: str
+    ) -> ValidationRule:
         """Extract validation rule from Click command.
 
         Args:
@@ -543,32 +549,66 @@ class REPL:
         # Add ASCII art lines
         for art_line in ascii_art:
             padding = box_width - len(art_line) - 2
-            intro_lines.append([
-                ("cyan", "│  "),
-                ("cyan bold", art_line),
-                ("", " " * padding),
-                ("cyan", "│"),
-            ])
+            intro_lines.append(
+                [
+                    ("cyan", "│  "),
+                    ("cyan bold", art_line),
+                    ("", " " * padding),
+                    ("cyan", "│"),
+                ]
+            )
 
-        intro_lines.extend([
-            [("cyan", "│" + " " * box_width + "│")],
-            [("cyan", "│"), ("bold", f"    {self.app_name}"), ("yellow", " v0.1.0"), ("", " " * (box_width - len(self.app_name) - 11)), ("cyan", "│")],
-            [("cyan", "│"), ("", "    Type "), ("green", "/quit"), ("", " to exit or "), ("green", "/hello <text>"), ("", " to greet"), ("", " " * (box_width - 48)), ("cyan", "│")],
-            [("cyan", "│"), ("", "    Press "), ("yellow", "Ctrl+J"), ("", " for multi-line input, "), ("yellow", "Enter"), ("", " to submit"), ("", " " * (box_width - 54)), ("cyan", "│")],
-            [("cyan", "│" + " " * box_width + "│")],
-            [("cyan", "╰" + "─" * box_width + "╯")],
-            [("", "")],
-            [("green bold", "Ready!"), ("", " (/ for commands). Use "), ("yellow", "↑↓"), ("", " arrows to navigate menu, "), ("yellow", "Tab"), ("", " or "), ("yellow", "Enter"), ("", " to select")],
-            [("", "")],
-        ])
+        intro_lines.extend(
+            [
+                [("cyan", "│" + " " * box_width + "│")],
+                [
+                    ("cyan", "│"),
+                    ("bold", f"    {self.app_name}"),
+                    ("yellow", " v0.1.0"),
+                    ("", " " * (box_width - len(self.app_name) - 11)),
+                    ("cyan", "│"),
+                ],
+                [
+                    ("cyan", "│"),
+                    ("", "    Type "),
+                    ("green", "/quit"),
+                    ("", " to exit or "),
+                    ("green", "/hello <text>"),
+                    ("", " to greet"),
+                    ("", " " * (box_width - 48)),
+                    ("cyan", "│"),
+                ],
+                [
+                    ("cyan", "│"),
+                    ("", "    Press "),
+                    ("yellow", "Ctrl+J"),
+                    ("", " for multi-line input, "),
+                    ("yellow", "Enter"),
+                    ("", " to submit"),
+                    ("", " " * (box_width - 54)),
+                    ("cyan", "│"),
+                ],
+                [("cyan", "│" + " " * box_width + "│")],
+                [("cyan", "╰" + "─" * box_width + "╯")],
+                [("", "")],
+                [
+                    ("green bold", "Ready!"),
+                    ("", " (/ for commands). Use "),
+                    ("yellow", "↑↓"),
+                    ("", " arrows to navigate menu, "),
+                    ("yellow", "Tab"),
+                    ("", " or "),
+                    ("yellow", "Enter"),
+                    ("", " to select"),
+                ],
+                [("", "")],
+            ]
+        )
 
         intro_text = intro_lines
 
         # State - use a mutable container so closures can modify it
         state = {
-            # PRESERVED Phase C.1: "output_lines": intro_text.copy(),
-            # PRESERVED Phase C.1: "output_scroll_offset": 0,  # Track scroll position (0 = at bottom)
-            # PRESERVED Phase C.1: "user_scrolled_output": False,  # True when user has scrolled up
             "completions": [],
             "selected_idx": 0,
             "placeholder_active": False,  # Track if <text> placeholder is shown
@@ -606,54 +646,13 @@ class REPL:
 
         # Grey divider
         divider_color = self.config.colors.divider
+
         def grey_line():
             return Window(
                 height=1,
-                content=FormattedTextControl(
-                    text=lambda: [(divider_color, "─" * 200)]
-                ),
+                content=FormattedTextControl(text=lambda: [(divider_color, "─" * 200)]),
             )
 
-        # PRESERVED: Original FormattedText-based output rendering (Phase C.1)
-        # # Helper to add output with auto-scroll support
-        # def add_output_line(line):
-        #     """Add a line to output with auto-scroll behavior.
-        #
-        #     If user hasn't scrolled up, reset scroll to bottom.
-        #     If user has scrolled up (scroll lock), preserve their position.
-        #     """
-        #     state["output_lines"].append(line)
-        #     # Auto-scroll to bottom unless user has scrolled up
-        #     if not state["user_scrolled_output"]:
-        #         state["output_scroll_offset"] = 0
-        #
-        # # Render output area - show recent lines
-        # def render_output():
-        #     """Render output with scroll offset support.
-        #
-        #     Scroll offset is from the bottom - 0 means show latest content at bottom.
-        #     Positive offset means show earlier content (scrolled up).
-        #     """
-        #     lines = state["output_lines"]
-        #     scroll_offset = state["output_scroll_offset"]
-        #
-        #     # If scrolled up, show content from (total - offset) position
-        #     # Otherwise show all content (prompt_toolkit handles display from bottom)
-        #     if scroll_offset > 0 and len(lines) > scroll_offset:
-        #         # Show content up to (total - offset) lines from bottom
-        #         end_idx = len(lines) - scroll_offset
-        #         lines = lines[:end_idx]
-        #
-        #     result = []
-        #     for line in lines:
-        #         if isinstance(line, list):
-        #             result.extend(line)
-        #         else:
-        #             result.append(("", str(line)))
-        #         result.append(("", "\n"))
-        #     return result
-
-        # NEW Phase D: Buffer-based output with ANSI support
         # Create output buffer (not read_only so we can write, but focusable=False prevents user edits)
         output_buffer = Buffer(name="output")
 
@@ -667,8 +666,7 @@ class REPL:
 
         # Initialize buffer with intro banner
         output_buffer.document = Document(
-            text=intro_text_ansi,
-            cursor_position=len(intro_text_ansi)
+            text=intro_text_ansi, cursor_position=len(intro_text_ansi)
         )
 
         # Helper to add output to buffer with auto-scroll
@@ -693,8 +691,7 @@ class REPL:
 
             # Update buffer document with auto-scroll to bottom
             output_buffer.document = Document(
-                text=new_text,
-                cursor_position=len(new_text)
+                text=new_text, cursor_position=len(new_text)
             )
 
         def format_command_display(command_text, has_error=False, has_warning=False):
@@ -732,7 +729,11 @@ class REPL:
 
                 for i, word in enumerate(arg_words):
                     # Check if current command is a group with this subcommand
-                    if current_cmd and hasattr(current_cmd, "commands") and word in current_cmd.commands:
+                    if (
+                        current_cmd
+                        and hasattr(current_cmd, "commands")
+                        and word in current_cmd.commands
+                    ):
                         subcommand_chain.append(word)
                         current_cmd = current_cmd.commands[word]
                     else:
@@ -764,7 +765,7 @@ class REPL:
             # Build command display line with subcommands
             cmd_display = [
                 (icon_color, icon + " "),
-                (self.config.colors.grey, "/" + cmd_name)
+                (self.config.colors.grey, "/" + cmd_name),
             ]
 
             # Add subcommands with arrow icons
@@ -853,7 +854,11 @@ class REPL:
 
                 highlight_color = self.config.colors.highlight
                 grey_color = self.config.colors.grey
-                style = f"{highlight_color} bold" if i == state["selected_idx"] else grey_color
+                style = (
+                    f"{highlight_color} bold"
+                    if i == state["selected_idx"]
+                    else grey_color
+                )
                 lines.append((style, formatted))
                 if i < end_idx - 1:
                     lines.append(("", "\n"))
@@ -868,17 +873,31 @@ class REPL:
             state["is_multiline"] = "\n" in text
 
             # Handle placeholder removal when user starts typing
-            if state["placeholder_active"] and "<text>" in text:
+            if state["placeholder_active"] and bool(
+                re.search("<[a-z0-9_]+>", text)
+            ):  # SF 6/1 for any text arg
+                # if state["placeholder_active"] and "<text>" in text:
                 cursor_pos = input_buffer.cursor_position
                 # If user is typing after the placeholder start position
                 if cursor_pos > state["placeholder_start"]:
                     # Find and remove the <text> placeholder
-                    placeholder_idx = text.find("<text>")
-                    if placeholder_idx >= 0:
+                    placeholder = re.search(
+                        "<[a-z0-9_]+>", text
+                    )  # SF 6/1 for any text arg
+                    # placeholder_idx = text.find("<text>")
+                    if bool(placeholder):
+                        # if placeholder_idx >= 0:
                         # Remove the placeholder from the buffer
-                        new_text = text[:placeholder_idx] + text[placeholder_idx + 6:]
+                        new_text = (
+                            text[: placeholder.span()[0]]
+                            + text[placeholder.span()[1] + 6 :]
+                        )
                         # Adjust cursor position
-                        new_cursor = cursor_pos - 6 if cursor_pos > placeholder_idx else cursor_pos
+                        new_cursor = (
+                            cursor_pos - 6
+                            if cursor_pos > placeholder.start()
+                            else cursor_pos
+                        )
                         input_buffer.text = new_text
                         input_buffer.cursor_position = new_cursor
                         state["placeholder_active"] = False
@@ -911,16 +930,7 @@ class REPL:
             on_text_changed=on_text_changed,
         )
 
-        # PRESERVED: Original FormattedTextControl output_window (Phase C.1)
-        # # Windows
-        # output_window = Window(
-        #     content=FormattedTextControl(text=render_output),
-        #     height=D(weight=1),  # Take remaining space
-        #     wrap_lines=True,
-        #     always_hide_cursor=True,  # Display only - no cursor
-        # )
-
-        # NEW Phase D: Output window with BufferControl + ANSILexer
+        # Output window with BufferControl + ANSILexer
         output_window = Window(
             content=BufferControl(
                 buffer=output_buffer,
@@ -954,7 +964,7 @@ class REPL:
                 return D(preferred=self.config.windows.input.initial_height)
             else:
                 # Calculate based on actual content
-                line_count = max(1, text.count('\n') + 1)
+                line_count = max(1, text.count("\n") + 1)
                 # No max limit - input can grow endlessly within terminal limits
                 return D(preferred=line_count)
 
@@ -1005,7 +1015,9 @@ class REPL:
             Keep menu visible after command execution to avoid jarring position jumps.
             Only collapse when user explicitly types non-slash input or clears.
             """
-            if (state["slash_command_active"] and state["completions"]) or state["menu_keep_visible"]:
+            if (state["slash_command_active"] and state["completions"]) or state[
+                "menu_keep_visible"
+            ]:
                 # Show full menu when slash command active OR when keeping visible after execution
                 return D(preferred=menu_preferred_height)
             else:
@@ -1020,15 +1032,17 @@ class REPL:
 
         # Layout with 5 windows
         layout = Layout(
-            HSplit([
-                output_window,
-                status_window,
-                grey_line(),
-                input_window,
-                grey_line(),
-                info_window,
-                menu_window,
-            ])
+            HSplit(
+                [
+                    output_window,
+                    status_window,
+                    grey_line(),
+                    input_window,
+                    grey_line(),
+                    info_window,
+                    menu_window,
+                ]
+            )
         )
 
         # Key bindings
@@ -1235,17 +1249,22 @@ class REPL:
                 text = text.replace(" <text>", "").replace("<text>", "")
 
             # Auto-complete if partial match or just "/"
-            if state["completions"] and state["selected_idx"] >= 0 and text.startswith("/"):
+            if (
+                state["completions"]
+                and state["selected_idx"] >= 0
+                and text.startswith("/")
+            ):
                 comp = state["completions"][state["selected_idx"]]
                 parts = text.split(maxsplit=1)
                 first_word = parts[0][1:] if parts else ""  # Remove /
                 rest_of_text = parts[1] if len(parts) > 1 else ""
 
                 # Auto-complete if just "/" or if it's a partial match
-                should_autocomplete = (
-                    text == "/" or  # Just slash
-                    (first_word and first_word != comp.text and comp.text.startswith(first_word))  # Partial match
-                )
+                should_autocomplete = text == "/" or (  # Just slash
+                    first_word
+                    and first_word != comp.text
+                    and comp.text.startswith(first_word)
+                )  # Partial match
 
                 if should_autocomplete:
                     text = "/" + comp.text
@@ -1274,13 +1293,19 @@ class REPL:
             cmd_args = args[1:]
 
             # Check if command exists (before validation, so we can show red bullet for unknown commands)
-            command_exists = (
-                cmd_name in ["quit", "exit", "status", "info"] or  # Built-in commands
-                (hasattr(self.cli, "commands") and cmd_name in self.cli.commands)  # Registered commands
-            )
+            command_exists = cmd_name in [
+                "quit",
+                "exit",
+                "status",
+                "info",
+            ] or (  # Built-in commands
+                hasattr(self.cli, "commands") and cmd_name in self.cli.commands
+            )  # Registered commands
 
             # Validate command before showing icon
-            validation_result, validation_level = self._validate_command(cmd_name, cmd_args)
+            validation_result, validation_level = self._validate_command(
+                cmd_name, cmd_args
+            )
 
             # Determine if command should be blocked
             should_block = False
@@ -1310,11 +1335,21 @@ class REPL:
             if validation_result.message:
                 if should_block:
                     add_output_line(
-                        [("red", f"{self.config.symbols.error} {validation_result.message}")]
+                        [
+                            (
+                                "red",
+                                f"{self.config.symbols.error} {validation_result.message}",
+                            )
+                        ]
                     )
                 elif has_warning:
                     add_output_line(
-                        [("yellow", f"{self.config.symbols.warning} {validation_result.message}")]
+                        [
+                            (
+                                "yellow",
+                                f"{self.config.symbols.warning} {validation_result.message}",
+                            )
+                        ]
                     )
 
             # Reset scroll lock on new command submission
@@ -1373,7 +1408,9 @@ class REPL:
                     if cmd_args and cmd_args[0] in cmd.commands:
                         subcmd = cmd.commands[cmd_args[0]]
                         subcmd_args = cmd_args[1:]
-                        self._execute_click_command(subcmd, subcmd_args, state, add_output_line)
+                        self._execute_click_command(
+                            subcmd, subcmd_args, state, add_output_line
+                        )
                     else:
                         # Just the group name, no subcommand
                         add_output_line([("", "")])
@@ -1490,7 +1527,7 @@ class REPL:
         import re
 
         # Find all ${ansi.XXX} patterns
-        pattern = r'\$\{ansi\.([^}]+)\}'
+        pattern = r"\$\{ansi\.([^}]+)\}"
 
         def replace_ansi(match):
             color_name = match.group(1)

@@ -1,4 +1,5 @@
 """Commands for Hello World demo app."""
+
 import subprocess
 
 import click
@@ -22,19 +23,22 @@ class HelloCommandsPlugin(CommandPlugin):
     def register(self, cli, context_factory):
         """Register commands with the REPL."""
 
+        # quit
         @click.command()
         def quit():
             """Exit the application."""
             print("Goodbye!")
             raise SystemExit(0)
 
+        # hello
         @click.command()
         @click.argument("text", nargs=-1, required=True)
-        def hello(text):
+        def hello(message):
             """Say hello with custom text."""
-            message = " ".join(text)
+            message = " ".join(message)
             print(f"hello - {message}")
 
+        # list files
         @click.command()
         @click.argument("path", nargs=-1)
         def list_files(path):
@@ -48,7 +52,7 @@ class HelloCommandsPlugin(CommandPlugin):
                     ["ls", "-la", target_path],
                     capture_output=True,
                     text=True,
-                    check=True
+                    check=True,
                 )
                 # Print the output - this will be captured by the REPL
                 print(result.stdout)
@@ -57,6 +61,7 @@ class HelloCommandsPlugin(CommandPlugin):
             except FileNotFoundError:
                 print("Error: 'ls' command not found")
 
+        # sub menus
         @click.group()
         def sub():
             """Colored text subcommands."""
@@ -76,7 +81,37 @@ class HelloCommandsPlugin(CommandPlugin):
             message = " ".join(text)
             print(f"BLUE: {message}")
 
+        # echo
+        @click.command()
+        @click.argument("message", nargs=-1)
+        def echo(message):
+            """Echo a message. DEPRECATED: Use '/print' instead."""
+            """click.echo(
+                "WARNING: The 'echo' command is deprecated, use '/print' instead"
+            )"""
+            print(" ".join(message))
+
+        @click.command()
+        @click.argument("how_do_you_want_be_greeted")
+        def greet(how_do_you_want_be_greeted):
+            """Greet someone (no validation needed - has default)."""
+            print(f"Hello, {how_do_you_want_be_greeted}!")
+
+        # deploy
+        @click.command()
+        @click.argument("environment", type=click.Choice(["dev", "staging", "prod"]))
+        def deploy(environment):
+            """Deploy to an environment (automatically validated!) - Valid environments: dev, staging, prod."""
+            if environment == "prod":
+                click.echo("WARNING: Deploying to PRODUCTION - use extreme caution!")
+
+            print(f"Deploying to {environment}...")
+            print(f"Deployment to {environment} successful!")
+
         # Register commands
+        cli.add_command(deploy, name="deploy")
+        cli.add_command(echo, name="echo")
+        cli.add_command(greet, name="greet")
         cli.add_command(quit, name="quit")
         cli.add_command(hello, name="hello")
         cli.add_command(list_files, name="list_files")
