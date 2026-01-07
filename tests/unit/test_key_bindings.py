@@ -267,3 +267,220 @@ class TestKeyBindingManager:
 
         # Should insert space
         assert " " in input_buffer.text
+
+    def test_handle_up_multiline_input(self, config):
+        """Test up arrow with multi-line input moves cursor up."""
+        state = REPLState()
+        state.is_multiline = True
+        state.slash_command_active = False
+
+        input_buffer = Buffer()
+        input_buffer.text = "line1\nline2\nline3"
+        input_buffer.cursor_position = len("line1\nline2\n")  # Start of line3
+
+        output_buffer = Buffer()
+        cli = click.Group()
+        layout_builder = Mock()
+        execute_callback = Mock()
+
+        manager = KeyBindingManager(
+            config, state, input_buffer, output_buffer, cli,
+            layout_builder, execute_callback
+        )
+
+        event = Mock()
+        event.current_buffer = input_buffer
+        event.app = Mock()
+
+        manager._handle_up(event)
+
+        # cursor_up should have been called on the buffer
+        event.app.invalidate.assert_called()
+
+    def test_handle_up_history_navigation(self, config):
+        """Test up arrow at start navigates history."""
+        state = REPLState()
+        state.slash_command_active = False
+        state.is_multiline = False
+
+        input_buffer = Buffer()
+        input_buffer.cursor_position = 0  # At start
+
+        output_buffer = Buffer()
+        cli = click.Group()
+        layout_builder = Mock()
+        execute_callback = Mock()
+
+        manager = KeyBindingManager(
+            config, state, input_buffer, output_buffer, cli,
+            layout_builder, execute_callback
+        )
+
+        event = Mock()
+        event.current_buffer = input_buffer
+        event.app = Mock()
+
+        manager._handle_up(event)
+
+        # Should call invalidate
+        event.app.invalidate.assert_called()
+
+    def test_handle_up_move_to_start(self, config):
+        """Test up arrow not at start moves cursor to start."""
+        state = REPLState()
+        state.slash_command_active = False
+        state.is_multiline = False
+
+        input_buffer = Buffer()
+        input_buffer.text = "hello"
+        input_buffer.cursor_position = 3  # Not at start
+
+        output_buffer = Buffer()
+        cli = click.Group()
+        layout_builder = Mock()
+        execute_callback = Mock()
+
+        manager = KeyBindingManager(
+            config, state, input_buffer, output_buffer, cli,
+            layout_builder, execute_callback
+        )
+
+        event = Mock()
+        event.current_buffer = input_buffer
+        event.app = Mock()
+
+        manager._handle_up(event)
+
+        # Should move to start
+        assert input_buffer.cursor_position == 0
+
+    def test_handle_down_multiline_input(self, config):
+        """Test down arrow with multi-line input moves cursor down."""
+        state = REPLState()
+        state.is_multiline = True
+        state.slash_command_active = False
+
+        input_buffer = Buffer()
+        input_buffer.text = "line1\nline2\nline3"
+
+        output_buffer = Buffer()
+        cli = click.Group()
+        layout_builder = Mock()
+        execute_callback = Mock()
+
+        manager = KeyBindingManager(
+            config, state, input_buffer, output_buffer, cli,
+            layout_builder, execute_callback
+        )
+
+        event = Mock()
+        event.current_buffer = input_buffer
+        event.app = Mock()
+
+        manager._handle_down(event)
+
+        # cursor_down should trigger invalidate
+        event.app.invalidate.assert_called()
+
+    def test_handle_down_history_forward(self, config):
+        """Test down arrow at start navigates history forward."""
+        state = REPLState()
+        state.slash_command_active = False
+        state.is_multiline = False
+
+        input_buffer = Buffer()
+        input_buffer.cursor_position = 0
+
+        output_buffer = Buffer()
+        cli = click.Group()
+        layout_builder = Mock()
+        execute_callback = Mock()
+
+        manager = KeyBindingManager(
+            config, state, input_buffer, output_buffer, cli,
+            layout_builder, execute_callback
+        )
+
+        event = Mock()
+        event.current_buffer = input_buffer
+        event.app = Mock()
+
+        manager._handle_down(event)
+
+        event.app.invalidate.assert_called()
+
+    def test_handle_down_move_to_start(self, config):
+        """Test down arrow not at start moves cursor to start."""
+        state = REPLState()
+        state.slash_command_active = False
+        state.is_multiline = False
+
+        input_buffer = Buffer()
+        input_buffer.text = "hello"
+        input_buffer.cursor_position = 3
+
+        output_buffer = Buffer()
+        cli = click.Group()
+        layout_builder = Mock()
+        execute_callback = Mock()
+
+        manager = KeyBindingManager(
+            config, state, input_buffer, output_buffer, cli,
+            layout_builder, execute_callback
+        )
+
+        event = Mock()
+        event.current_buffer = input_buffer
+        event.app = Mock()
+
+        manager._handle_down(event)
+
+        assert input_buffer.cursor_position == 0
+
+    def test_handle_pageup(self, config):
+        """Test page up scrolls output buffer."""
+        state = REPLState()
+        input_buffer = Buffer()
+        output_buffer = Buffer()
+        output_buffer.text = "line1\nline2\nline3\nline4\nline5"
+
+        cli = click.Group()
+        layout_builder = Mock()
+        execute_callback = Mock()
+
+        manager = KeyBindingManager(
+            config, state, input_buffer, output_buffer, cli,
+            layout_builder, execute_callback
+        )
+
+        event = Mock()
+        event.current_buffer = input_buffer
+        event.app = Mock()
+
+        manager._handle_pageup(event)
+
+        event.app.invalidate.assert_called()
+
+    def test_handle_pagedown(self, config):
+        """Test page down scrolls output buffer."""
+        state = REPLState()
+        input_buffer = Buffer()
+        output_buffer = Buffer()
+        output_buffer.text = "line1\nline2\nline3\nline4\nline5"
+
+        cli = click.Group()
+        layout_builder = Mock()
+        execute_callback = Mock()
+
+        manager = KeyBindingManager(
+            config, state, input_buffer, output_buffer, cli,
+            layout_builder, execute_callback
+        )
+
+        event = Mock()
+        event.current_buffer = input_buffer
+        event.app = Mock()
+
+        manager._handle_pagedown(event)
+
+        event.app.invalidate.assert_called()
