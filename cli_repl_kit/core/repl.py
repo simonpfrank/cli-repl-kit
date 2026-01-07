@@ -605,7 +605,7 @@ class REPL:
         }
 
         # Helper to get argument info for a command
-        def get_command_args(cmd_name, subcmd_name=None):
+        def get_argument_placeholder_text(cmd_name, subcmd_name=None):
             """Get argument placeholder text for a command."""
             if not hasattr(self.cli, "commands"):
                 return None
@@ -1158,7 +1158,7 @@ class REPL:
                 buffer.insert_text(" ")
             else:
                 # Check for argument placeholder
-                arg_placeholder = get_command_args(cmd_name, subcmd_name)
+                arg_placeholder = get_argument_placeholder_text(cmd_name, subcmd_name)
                 if arg_placeholder:
                     buffer.insert_text(" " + arg_placeholder)
                     # Position cursor at start of placeholder (on the <)
@@ -1188,7 +1188,7 @@ class REPL:
                         buffer.insert_text(" ")
                     else:
                         # Regular command - check for args
-                        arg_placeholder = get_command_args(cmd_name)
+                        arg_placeholder = get_argument_placeholder_text(cmd_name)
                         if arg_placeholder:
                             buffer.insert_text(" " + arg_placeholder)
                             cursor_pos = buffer.cursor_position - len(arg_placeholder)
@@ -1207,7 +1207,7 @@ class REPL:
                 if hasattr(self.cli, "commands") and cmd_name in self.cli.commands:
                     cmd = self.cli.commands[cmd_name]
                     if hasattr(cmd, "commands") and subcmd_name in cmd.commands:
-                        arg_placeholder = get_command_args(cmd_name, subcmd_name)
+                        arg_placeholder = get_argument_placeholder_text(cmd_name, subcmd_name)
                         if arg_placeholder:
                             buffer.insert_text(" " + arg_placeholder)
                             cursor_pos = buffer.cursor_position - len(arg_placeholder)
