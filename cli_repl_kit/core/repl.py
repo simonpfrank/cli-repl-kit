@@ -22,6 +22,7 @@ from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 from prompt_toolkit.lexers import Lexer
 
 from cli_repl_kit.core.formatting import ANSILexer, formatted_text_to_ansi_string
+from cli_repl_kit.core.key_bindings import KeyBindingManager
 from cli_repl_kit.core.layout import ConditionalScrollbarMargin, LayoutBuilder
 from cli_repl_kit.core.output_capture import OutputCapture
 from cli_repl_kit.core.state import REPLState
@@ -681,241 +682,20 @@ class REPL:
         layout_builder = LayoutBuilder(self.config, state, self.cli)
         layout = layout_builder.build(input_buffer, output_buffer)
 
-        # Key bindings
-        kb = KeyBindings()
+        # Command execution callback for key bindings
+        def execute_command_callback(text: str, event: Any) -> None:
+            """Execute a command entered by the user.
 
-        @kb.add("c-c")
-        def exit_app(event):
-            event.app.exit()
-
-        @kb.add("escape")
-        def clear_input(event):
-            """Clear the input buffer on ESC."""
-            event.current_buffer.text = ""
-            event.current_buffer.cursor_position = 0
-            state.placeholder_active = False
-            state.menu_keep_visible = False  # Collapse menu when clearing input
-            event.app.invalidate()
-
-        @kb.add("c-j")
-        def insert_newline(event):
-            event.current_buffer.insert_text("\n")
-
-        @kb.add("up")
-        def handle_up(event):
-            """Context-dependent up arrow handling."""
-            buffer = event.current_buffer
-
-            # Context 1: Slash command active with > 1 option - navigate menu
-            if state.slash_command_active and len(state.completions) > 1:
-                if state.selected_idx > 0:
-                    state.selected_idx -= 1
-                    event.app.invalidate()
-                return
-
-            # Context 2: Multi-line input - move cursor up one line
-            if state.is_multiline:
-                buffer.cursor_up()
-                event.app.invalidate()
-                return
-
-            # Context 3: Single-line, cursor at start - navigate history
-            if buffer.cursor_position == 0:
-                # Navigate to previous command in history
-                buffer.history_backward()
-                event.app.invalidate()
-                return
-
-            # Context 4: Single-line, cursor not at start - move to start (safety)
-            buffer.cursor_position = 0
-            event.app.invalidate()
-
-        @kb.add("down")
-        def handle_down(event):
-            """Context-dependent down arrow handling."""
-            buffer = event.current_buffer
-
-            # Context 1: Slash command active with > 1 option - navigate menu
-            if state.slash_command_active and len(state.completions) > 1:
-                if state.selected_idx < len(state.completions) - 1:
-                    state.selected_idx += 1
-                    event.app.invalidate()
-                return
-
-            # Context 2: Multi-line input - move cursor down one line
-            if state.is_multiline:
-                buffer.cursor_down()
-                event.app.invalidate()
-                return
-
-            # Context 3: Single-line, cursor at start - navigate history
-            if buffer.cursor_position == 0:
-                # Navigate to next command in history
-                buffer.history_forward()
-                event.app.invalidate()
-                return
-
-            # Context 4: Single-line, cursor not at start - move to start (safety)
-            buffer.cursor_position = 0
-            event.app.invalidate()
-
-        # Mouse wheel routing (context-dependent)
-        # Note: Mouse wheel scrolling in prompt_toolkit is handled automatically
-        # by the windows with mouse_support=True
-
-        # Page Up/Down for output scrolling
-        page_scroll_lines = 10  # Number of lines to scroll per page
-
-        @kb.add("pageup")
-        def scroll_output_up(event):
-            """Scroll output buffer up by one page."""
-            output_buffer.cursor_up(count=page_scroll_lines)
-            event.app.invalidate()
-
-        @kb.add("pagedown")
-        def scroll_output_down(event):
-            """Scroll output buffer down by one page."""
-            output_buffer.cursor_down(count=page_scroll_lines)
-            event.app.invalidate()
-
-        @kb.add("tab")
-        def do_tab(event):
-            """Complete command and add argument placeholder if needed."""
-            if not state.completions or state.selected_idx < 0:
-                return
-
-            comp = state.completions[state.selected_idx]
-            buffer = event.current_buffer
-
-            # Delete what the completion replaces
-            if comp.start_position:
-                buffer.delete_before_cursor(-comp.start_position)
-
-            # Insert completion
-            buffer.insert_text(comp.text)
-
-            # Check if this command/subcommand needs arguments
-            parts = buffer.text.lstrip("/").split()
-            cmd_name = parts[0] if parts else ""
-            subcmd_name = parts[1] if len(parts) > 1 else None
-
-            # Check if it's a group (needs subcommand)
-            is_group = False
-            if hasattr(self.cli, "commands") and cmd_name in self.cli.commands:
-                cmd = self.cli.commands[cmd_name]
-                is_group = hasattr(cmd, "commands")
-
-            if is_group and not subcmd_name:
-                # It's a group, add space to trigger subcommand completions
-                buffer.insert_text(" ")
-            else:
-                # Check for argument placeholder
-                arg_placeholder = layout_builder.get_argument_placeholder_text(cmd_name, subcmd_name)
-                if arg_placeholder:
-                    buffer.insert_text(" " + arg_placeholder)
-                    # Position cursor at start of placeholder (on the <)
-                    cursor_pos = buffer.cursor_position - len(arg_placeholder)
-                    buffer.cursor_position = cursor_pos
-                    state.placeholder_active = True
-                    state.placeholder_start = cursor_pos
-
-            event.app.invalidate()
-
-        @kb.add("space")
-        def do_space(event):
-            """Handle space - may trigger placeholder after command."""
-            buffer = event.current_buffer
-            text = buffer.text.strip()
-
-            # Check if we're completing a command with space
-            if text.startswith("/") and " " not in text:
-                # First space after /command - check for exact match
-                cmd_name = text[1:]  # Remove /
-                if hasattr(self.cli, "commands") and cmd_name in self.cli.commands:
-                    cmd = self.cli.commands[cmd_name]
-
-                    # Check if it's a group
-                    if hasattr(cmd, "commands"):
-                        # Group - just add space for subcommand
-                        buffer.insert_text(" ")
-                    else:
-                        # Regular command - check for args
-                        arg_placeholder = layout_builder.get_argument_placeholder_text(cmd_name)
-                        if arg_placeholder:
-                            buffer.insert_text(" " + arg_placeholder)
-                            cursor_pos = buffer.cursor_position - len(arg_placeholder)
-                            buffer.cursor_position = cursor_pos
-                            state.placeholder_active = True
-                            state.placeholder_start = cursor_pos
-                        else:
-                            buffer.insert_text(" ")
-                    event.app.invalidate()
-                    return
-
-            # Check if this is space after a subcommand
-            parts = text.lstrip("/").split()
-            if len(parts) == 2:  # /cmd subcmd<space>
-                cmd_name, subcmd_name = parts
-                if hasattr(self.cli, "commands") and cmd_name in self.cli.commands:
-                    cmd = self.cli.commands[cmd_name]
-                    if hasattr(cmd, "commands") and subcmd_name in cmd.commands:
-                        arg_placeholder = layout_builder.get_argument_placeholder_text(cmd_name, subcmd_name)
-                        if arg_placeholder:
-                            buffer.insert_text(" " + arg_placeholder)
-                            cursor_pos = buffer.cursor_position - len(arg_placeholder)
-                            buffer.cursor_position = cursor_pos
-                            state.placeholder_active = True
-                            state.placeholder_start = cursor_pos
-                            event.app.invalidate()
-                            return
-
-            # Default: just insert space
-            buffer.insert_text(" ")
-            event.app.invalidate()
-
-        @kb.add("enter")
-        def do_enter(event):
-            """Execute command."""
-            buffer = event.current_buffer
-            original_text = buffer.text  # Preserve original with blank lines
-            text = original_text.strip()  # Use stripped for execution
-
-            # Remove placeholder if still present
-            if "<text>" in text:
-                text = text.replace(" <text>", "").replace("<text>", "")
-
-            # Auto-complete if partial match or just "/"
-            if (
-                state.completions
-                and state.selected_idx >= 0
-                and text.startswith("/")
-            ):
-                comp = state.completions[state.selected_idx]
-                parts = text.split(maxsplit=1)
-                first_word = parts[0][1:] if parts else ""  # Remove /
-                rest_of_text = parts[1] if len(parts) > 1 else ""
-
-                # Auto-complete if just "/" or if it's a partial match
-                should_autocomplete = text == "/" or (  # Just slash
-                    first_word
-                    and first_word != comp.text
-                    and comp.text.startswith(first_word)
-                )  # Partial match
-
-                if should_autocomplete:
-                    text = "/" + comp.text
-                    if rest_of_text:
-                        text += " " + rest_of_text
-
-            if not text:
-                return
-
+            Args:
+                text: The command text to execute
+                event: The key event (for app.invalidate())
+            """
             # Parse command name and args early for validation
             if text.startswith("/"):
                 command = text[1:]
             elif enable_agent_mode:
                 append_to_output_buffer([("cyan", "Echo: "), ("", text)])
-                append_to_output_buffer([("", "")])  # Add blank line for consistency
+                append_to_output_buffer([("", "")])
                 event.app.invalidate()
                 return
             else:
@@ -928,15 +708,13 @@ class REPL:
             cmd_name = args[0]
             cmd_args = args[1:]
 
-            # Check if command exists (before validation, so we can show red bullet for unknown commands)
+            # Check if command exists
             command_exists = cmd_name in [
                 "quit",
                 "exit",
                 "status",
                 "info",
-            ] or (  # Built-in commands
-                hasattr(self.cli, "commands") and cmd_name in self.cli.commands
-            )  # Registered commands
+            ] or (hasattr(self.cli, "commands") and cmd_name in self.cli.commands)
 
             # Validate command before showing icon
             validation_result, validation_level = self._validate_command(
@@ -949,7 +727,6 @@ class REPL:
             has_error = False
 
             if not command_exists:
-                # Unknown command - show red bullet
                 has_error = True
             elif validation_level == "required" and validation_result.should_block():
                 should_block = True
@@ -988,19 +765,14 @@ class REPL:
                         ]
                     )
 
-            # Block execution if validation failed with required level
+            # Block execution if validation failed
             if should_block:
-                # Don't add to history, don't clear buffer, don't execute
-                append_to_output_buffer([("", "")])  # Add blank line for consistency
+                append_to_output_buffer([("", "")])
                 event.app.invalidate()
                 return
 
-            # Add to history before clearing buffer (only if not blocked)
-            buffer.append_to_history()
-
-            # Clear buffer
-            buffer.text = ""
-            state.placeholder_active = False
+            # Add to history before clearing buffer
+            input_buffer.append_to_history()
 
             # Handle quit/exit
             if cmd_name in ["quit", "exit"]:
@@ -1009,33 +781,10 @@ class REPL:
                 event.app.exit()
                 return
 
-            # Handle built-in status command
-            if cmd_name == "status":
-                if cmd_args:
-                    message = " ".join(cmd_args)
-                    self.set_status(message)
-                else:
-                    self.clear_status()
-                append_to_output_buffer([("", "")])  # Add blank line for consistency
-                event.app.invalidate()
-                return
-
-            # Handle built-in info command
-            if cmd_name == "info":
-                if cmd_args:
-                    message = " ".join(cmd_args)
-                    self.set_info(message)
-                else:
-                    self.clear_info()
-                append_to_output_buffer([("", "")])  # Add blank line for consistency
-                event.app.invalidate()
-                return
-
             # Execute command
             if hasattr(self.cli, "commands") and cmd_name in self.cli.commands:
                 cmd = self.cli.commands[cmd_name]
-
-                # Handle group commands
+                # Check if it's a group with subcommand
                 if hasattr(cmd, "commands"):
                     if cmd_args and cmd_args[0] in cmd.commands:
                         subcmd = cmd.commands[cmd_args[0]]
@@ -1044,7 +793,6 @@ class REPL:
                             subcmd, subcmd_args, state, append_to_output_buffer
                         )
                     else:
-                        # Just the group name, no subcommand
                         append_to_output_buffer([("", "")])
                 else:
                     # Regular command
@@ -1056,6 +804,18 @@ class REPL:
             append_to_output_buffer([("", "")])
 
             event.app.invalidate()
+
+        # Create key bindings using KeyBindingManager
+        key_manager = KeyBindingManager(
+            config=self.config,
+            state=state,
+            input_buffer=input_buffer,
+            output_buffer=output_buffer,
+            cli=self.cli,
+            layout_builder=layout_builder,
+            execute_callback=execute_command_callback,
+        )
+        kb = key_manager.create_bindings()
 
         # Create application
         app: Application[None] = Application(
