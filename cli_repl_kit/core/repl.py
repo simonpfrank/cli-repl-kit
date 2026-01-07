@@ -654,7 +654,7 @@ class REPL:
         )
 
         # Helper to add output to buffer with auto-scroll
-        def add_output_line(line):
+        def append_to_output_buffer(line):
             """Add a line to output buffer with auto-scroll behavior.
 
             Args:
@@ -1262,8 +1262,8 @@ class REPL:
             if text.startswith("/"):
                 command = text[1:]
             elif enable_agent_mode:
-                add_output_line([("cyan", "Echo: "), ("", text)])
-                add_output_line([("", "")])  # Add blank line for consistency
+                append_to_output_buffer([("cyan", "Echo: "), ("", text)])
+                append_to_output_buffer([("", "")])  # Add blank line for consistency
                 event.app.invalidate()
                 return
             else:
@@ -1313,12 +1313,12 @@ class REPL:
                 text, has_error=has_error, has_warning=has_warning
             )
             for line in formatted_lines:
-                add_output_line(line)
+                append_to_output_buffer(line)
 
             # Display validation message if present
             if validation_result.message:
                 if should_block:
-                    add_output_line(
+                    append_to_output_buffer(
                         [
                             (
                                 "red",
@@ -1327,7 +1327,7 @@ class REPL:
                         ]
                     )
                 elif has_warning:
-                    add_output_line(
+                    append_to_output_buffer(
                         [
                             (
                                 "yellow",
@@ -1343,7 +1343,7 @@ class REPL:
             # Block execution if validation failed with required level
             if should_block:
                 # Don't add to history, don't clear buffer, don't execute
-                add_output_line([("", "")])  # Add blank line for consistency
+                append_to_output_buffer([("", "")])  # Add blank line for consistency
                 event.app.invalidate()
                 return
 
@@ -1356,7 +1356,7 @@ class REPL:
 
             # Handle quit/exit
             if cmd_name in ["quit", "exit"]:
-                add_output_line([("", "Goodbye!")])
+                append_to_output_buffer([("", "Goodbye!")])
                 event.app.invalidate()
                 event.app.exit()
                 return
@@ -1368,7 +1368,7 @@ class REPL:
                     self.set_status(message)
                 else:
                     self.clear_status()
-                add_output_line([("", "")])  # Add blank line for consistency
+                append_to_output_buffer([("", "")])  # Add blank line for consistency
                 event.app.invalidate()
                 return
 
@@ -1379,7 +1379,7 @@ class REPL:
                     self.set_info(message)
                 else:
                     self.clear_info()
-                add_output_line([("", "")])  # Add blank line for consistency
+                append_to_output_buffer([("", "")])  # Add blank line for consistency
                 event.app.invalidate()
                 return
 
@@ -1397,15 +1397,15 @@ class REPL:
                         )
                     else:
                         # Just the group name, no subcommand
-                        add_output_line([("", "")])
+                        append_to_output_buffer([("", "")])
                 else:
                     # Regular command
                     self._execute_click_command(cmd, cmd_args, state, add_output_line)
             else:
-                add_output_line([("red", f"Unknown command: {cmd_name}")])
+                append_to_output_buffer([("red", f"Unknown command: {cmd_name}")])
 
             # Add empty line after command output
-            add_output_line([("", "")])
+            append_to_output_buffer([("", "")])
 
             event.app.invalidate()
 
@@ -1454,7 +1454,7 @@ class REPL:
         # Fallback to direct append if no callback provided
         if add_output_line is None:
 
-            def add_output_line(line):
+            def append_to_output_buffer(line):
                 state["output_lines"].append(line)
 
         stdout_buf = io.StringIO()
@@ -1479,9 +1479,9 @@ class REPL:
         except SystemExit:
             pass
         except click.exceptions.MissingParameter as e:
-            add_output_line([("red", f"Missing argument: {e.param.name}")])
+            append_to_output_buffer([("red", f"Missing argument: {e.param.name}")])
         except Exception as e:
-            add_output_line([("red", f"Error: {str(e)}")])
+            append_to_output_buffer([("red", f"Error: {str(e)}")])
 
         # Add output
         stdout_text = stdout_buf.getvalue()
@@ -1489,10 +1489,10 @@ class REPL:
 
         if stdout_text:
             for line in stdout_text.rstrip().split("\n"):
-                add_output_line([("", line)])
+                append_to_output_buffer([("", line)])
         if stderr_text:
             for line in stderr_text.rstrip().split("\n"):
-                add_output_line([("red", line)])
+                append_to_output_buffer([("red", line)])
 
     # API methods for status and info lines
 
