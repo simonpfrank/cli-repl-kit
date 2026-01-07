@@ -224,3 +224,197 @@ class TestCommandExecutor:
 
         # Should append error message
         executor.append_output.assert_called()
+
+    def test_execute_command_with_agent_mode(self, config, cli_group):
+        """Test executing non-slash text with agent mode enabled."""
+        validate_cb = Mock(return_value=(ValidationResult(status="valid"), None))
+        append_output = Mock()
+
+        executor = CommandExecutor(
+            config=config,
+            cli=cli_group,
+            validate_callback=validate_cb,
+            append_output_callback=append_output,
+        )
+
+        input_buffer = Mock()
+        event = Mock()
+
+        # Execute non-slash text with agent mode
+        executor.execute_command("hello world", input_buffer, True, event)
+
+        # Should echo the text
+        assert any("Echo:" in str(call) or "hello world" in str(call)
+                   for call in append_output.call_args_list)
+
+    def test_execute_command_empty_args(self, config, cli_group):
+        """Test executing command with empty arguments."""
+        validate_cb = Mock(return_value=(ValidationResult(status="valid"), None))
+        append_output = Mock()
+
+        executor = CommandExecutor(
+            config=config,
+            cli=cli_group,
+            validate_callback=validate_cb,
+            append_output_callback=append_output,
+        )
+
+        input_buffer = Mock()
+        event = Mock()
+
+        # Execute just slash with no command
+        executor.execute_command("/", input_buffer, False, event)
+
+        # Should return early, no execution
+        validate_cb.assert_not_called()
+
+    def test_execute_command_unknown_command(self, config, cli_group):
+        """Test executing unknown command."""
+        validate_cb = Mock(return_value=(ValidationResult(status="valid"), None))
+        append_output = Mock()
+
+        executor = CommandExecutor(
+            config=config,
+            cli=cli_group,
+            validate_callback=validate_cb,
+            append_output_callback=append_output,
+        )
+
+        input_buffer = Mock()
+        event = Mock()
+
+        # Execute unknown command
+        executor.execute_command("/unknown", input_buffer, False, event)
+
+        # Should show unknown command error
+        assert any("Unknown command" in str(call) or "unknown" in str(call)
+                   for call in append_output.call_args_list)
+
+    def test_execute_command_with_subcommand(self, config):
+        """Test executing subcommand from group."""
+        cli_group = click.Group()
+
+        # Add group with subcommand
+        config_group = click.Group(name="config")
+
+        @config_group.command()
+        @click.argument("key")
+        def get(key):
+            """Get config value."""
+            print(f"Config: {key}")
+
+        cli_group.add_command(config_group)
+
+        validate_cb = Mock(return_value=(ValidationResult(status="valid"), None))
+        append_output = Mock()
+
+        executor = CommandExecutor(
+            config=config,
+            cli=cli_group,
+            validate_callback=validate_cb,
+            append_output_callback=append_output,
+        )
+
+        input_buffer = Mock()
+        event = Mock()
+
+        # Execute subcommand
+        executor.execute_command("/config get mykey", input_buffer, False, event)
+
+        # Should execute and show output
+        input_buffer.append_to_history.assert_called()
+        assert len(append_output.call_args_list) > 0
+
+    def test_execute_command_group_without_subcommand(self, config):
+        """Test executing group command without specifying subcommand."""
+        cli_group = click.Group()
+
+        # Add group
+        config_group = click.Group(name="config")
+        cli_group.add_command(config_group)
+
+        validate_cb = Mock(return_value=(ValidationResult(status="valid"), None))
+        append_output = Mock()
+
+        executor = CommandExecutor(
+            config=config,
+            cli=cli_group,
+            validate_callback=validate_cb,
+            append_output_callback=append_output,
+        )
+
+        input_buffer = Mock()
+        event = Mock()
+
+        # Execute group without subcommand
+        executor.execute_command("/config", input_buffer, False, event)
+
+        # Should append empty line
+        append_output.assert_called()
+
+    def test_execute_click_command_with_system_exit(self, config, cli_group):
+        """Test command that raises SystemExit is handled."""
+        # Create command that raises SystemExit
+        @click.command()
+        def exit_cmd():
+            raise SystemExit(0)
+
+        validate_cb = Mock()
+        append_output = Mock()
+
+        executor = CommandExecutor(
+            config=config,
+            cli=cli_group,
+            validate_callback=validate_cb,
+            append_output_callback=append_output,
+        )
+
+        # Should not raise SystemExit
+        executor._execute_click_command(exit_cmd, [])
+
+        # Should complete without error
+        assert True
+
+    def test_execute_click_command_with_general_exception(self, config, cli_group):
+        """Test command that raises general exception."""
+        @click.command()
+        def error_cmd():
+            raise ValueError("Test error")
+
+        validate_cb = Mock()
+        append_output = Mock()
+
+        executor = CommandExecutor(
+            config=config,
+            cli=cli_group,
+            validate_callback=validate_cb,
+            append_output_callback=append_output,
+        )
+
+        executor._execute_click_command(error_cmd, [])
+
+        # Should append error message
+        assert any("Error:" in str(call) or "Test error" in str(call)
+                   for call in append_output.call_args_list)
+
+    def test_execute_click_command_with_stderr_output(self, config, cli_group):
+        """Test command that writes to stderr."""
+        @click.command()
+        def stderr_cmd():
+            import sys
+            sys.stderr.write("Error message\n")
+
+        validate_cb = Mock()
+        append_output = Mock()
+
+        executor = CommandExecutor(
+            config=config,
+            cli=cli_group,
+            validate_callback=validate_cb,
+            append_output_callback=append_output,
+        )
+
+        executor._execute_click_command(stderr_cmd, [])
+
+        # Should append stderr output
+        assert any("Error message" in str(call) for call in append_output.call_args_list)
