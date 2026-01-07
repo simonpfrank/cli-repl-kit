@@ -22,7 +22,7 @@ from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 from prompt_toolkit.lexers import Lexer
 
 from cli_repl_kit.core.formatting import ANSILexer, formatted_text_to_ansi_string
-from cli_repl_kit.core.layout import ConditionalScrollbarMargin
+from cli_repl_kit.core.layout import ConditionalScrollbarMargin, LayoutBuilder
 from cli_repl_kit.core.output_capture import OutputCapture
 from cli_repl_kit.core.state import REPLState
 from cli_repl_kit.plugins.base import ValidationResult
@@ -468,39 +468,6 @@ class REPL:
         # State - typed state object (replaces mutable dict)
         state = REPLState()
 
-        # Helper to get argument info for a command
-        def get_argument_placeholder_text(cmd_name, subcmd_name=None):
-            """Get argument placeholder text for a command."""
-            if not hasattr(self.cli, "commands"):
-                return None
-            if cmd_name not in self.cli.commands:
-                return None
-
-            cmd = self.cli.commands[cmd_name]
-
-            # If it's a group and we have a subcommand
-            if subcmd_name and hasattr(cmd, "commands"):
-                if subcmd_name in cmd.commands:
-                    cmd = cmd.commands[subcmd_name]
-                else:
-                    return None
-
-            # Check for arguments
-            if hasattr(cmd, "params"):
-                for param in cmd.params:
-                    if isinstance(param, click.Argument):
-                        return f"<{param.name}>"
-            return None
-
-        # Grey divider
-        divider_color = self.config.colors.divider
-
-        def create_divider_window():
-            return Window(
-                height=1,
-                content=FormattedTextControl(text=lambda: [(divider_color, "─" * 200)]),
-            )
-
         # Create output buffer (not read_only so we can write, but focusable=False prevents user edits)
         output_buffer = Buffer(name="output")
 
@@ -644,74 +611,6 @@ class REPL:
 
             return lines
 
-        # Render status line
-        def render_status():
-            """Render status line content."""
-            if not state.status_text:
-                return []
-            return state.status_text
-
-        # Render info line
-        def render_info():
-            """Render info line content."""
-            if not state.info_text:
-                return []
-            return state.info_text
-
-        # Render completion menu
-        def render_completions():
-            if not state.completions:
-                return []
-
-            text = input_buffer.text
-            is_top_level = " " not in text.rstrip()
-
-            # Calculate visible window of completions based on menu height
-            menu_height = self.config.windows.menu.height
-            total_completions = len(state.completions)
-            selected_idx = state.selected_idx
-
-            # Calculate the window of completions to show
-            if total_completions <= menu_height:
-                # Show all if they fit
-                start_idx = 0
-                end_idx = total_completions
-            else:
-                # Show a window centered around the selected item
-                # Try to keep selected item in the middle
-                half_window = menu_height // 2
-                start_idx = max(0, selected_idx - half_window)
-                end_idx = min(total_completions, start_idx + menu_height)
-
-                # Adjust if we hit the end
-                if end_idx == total_completions:
-                    start_idx = max(0, end_idx - menu_height)
-
-            lines = []
-            for i in range(start_idx, end_idx):
-                comp = state.completions[i]
-                cmd_text = str(comp.text)
-                help_text = comp.display_meta if hasattr(comp, "display_meta") else ""
-                if isinstance(help_text, list):
-                    help_text = "".join(t for _, t in help_text)
-                else:
-                    help_text = str(help_text) if help_text else ""
-
-                prefix = "/" if is_top_level else ""
-                formatted = f"{prefix}{cmd_text:<19} {help_text}"
-
-                highlight_color = self.config.colors.highlight
-                grey_color = self.config.colors.grey
-                style = (
-                    f"{highlight_color} bold"
-                    if i == state.selected_idx
-                    else grey_color
-                )
-                lines.append((style, formatted))
-                if i < end_idx - 1:
-                    lines.append(("", "\n"))
-            return lines
-
         # Update completions on text change
         def on_text_changed(_):
             text = input_buffer.text
@@ -778,118 +677,9 @@ class REPL:
             on_text_changed=on_text_changed,
         )
 
-        # Output window with BufferControl + ANSILexer
-        output_window = Window(
-            content=BufferControl(
-                buffer=output_buffer,
-                focusable=False,  # Display-only - mouse selection disabled for now
-                include_default_input_processors=False,
-                lexer=ANSILexer(),  # Render ANSI codes as styled text
-            ),
-            height=D(weight=1),  # Take remaining space
-            wrap_lines=True,
-            always_hide_cursor=True,  # No cursor in display-only area
-        )
-
-        # Function to show prompt (configurable, with dynamic continuation spacing)
-        prompt_char = self.config.prompt.character  # e.g., "> " or "Agent >"
-
-        def get_input_prompt(line_number, wrap_count):
-            """Show configurable prompt on first line, matching indent on continuation lines."""
-            if line_number == 0 and wrap_count == 0:
-                return [("bold", prompt_char)]
-            else:
-                # Continuation spacing matches prompt length for alignment
-                return [("", " " * len(prompt_char))]
-
-        # Dynamic height based on buffer content (no max - grows endlessly)
-        def get_input_height():
-            """Calculate input height based on number of lines in buffer."""
-            # Count newlines in buffer to determine line count
-            text = input_buffer.text
-            if not text:
-                # Empty buffer - use initial height from config
-                return D(preferred=self.config.windows.input.initial_height)
-            else:
-                # Calculate based on actual content
-                line_count = max(1, text.count("\n") + 1)
-                # No max limit - input can grow endlessly within terminal limits
-                return D(preferred=line_count)
-
-        input_window = Window(
-            content=BufferControl(
-                buffer=input_buffer,
-                lexer=None,
-                input_processors=[],
-                include_default_input_processors=False,
-            ),
-            height=get_input_height,  # Dynamic height: 1 line when empty, grows endlessly
-            wrap_lines=True,
-            get_line_prefix=get_input_prompt,  # Add > prompt
-            dont_extend_height=True,  # Don't extend beyond calculated height
-            # NO scrollbar - input grows endlessly, no internal scrolling
-            # NO scroll_offsets - was causing 4-line initial height bug
-        )
-
-        # Status and info windows
-        status_window = Window(
-            content=FormattedTextControl(text=render_status),
-            height=self.config.windows.status.height,
-            wrap_lines=False,  # Truncate overflow
-        )
-
-        # Dynamic info height - show 1 line when info text is set, otherwise 0
-        def get_info_height():
-            """Calculate info height dynamically based on whether info is set."""
-            if state.info_text:
-                return D(preferred=1, min=1, max=1)
-            else:
-                return D(preferred=0, min=0, max=0)
-
-        info_window = Window(
-            content=FormattedTextControl(text=render_info),
-            height=get_info_height,  # Dynamic height based on info text
-            wrap_lines=False,  # Truncate overflow
-        )
-
-        # Dynamic menu height - shows preferred height when slash command active,
-        # otherwise minimal height to save space
-        menu_preferred_height = self.config.windows.menu.height
-
-        def get_menu_height():
-            """Calculate menu height dynamically.
-
-            When slash command is active with completions, show full menu height.
-            Keep menu visible after command execution to avoid jarring position jumps.
-            Only collapse when user explicitly types non-slash input or clears.
-            """
-            if (state.slash_command_active and state.completions) or state.menu_keep_visible:
-                # Show full menu when slash command active OR when keeping visible after execution
-                return D(preferred=menu_preferred_height)
-            else:
-                # Zero height when not active - completely hidden
-                return D(preferred=0, min=0)
-
-        menu_window = Window(
-            content=FormattedTextControl(text=render_completions),
-            height=get_menu_height,  # Dynamic height based on slash command state
-            wrap_lines=True,
-        )
-
-        # Layout with 5 windows
-        layout = Layout(
-            HSplit(
-                [
-                    output_window,
-                    status_window,
-                    create_divider_window(),
-                    input_window,
-                    create_divider_window(),
-                    info_window,
-                    menu_window,
-                ]
-            )
-        )
+        # Create layout using LayoutBuilder
+        layout_builder = LayoutBuilder(self.config, state, self.cli)
+        layout = layout_builder.build(input_buffer, output_buffer)
 
         # Key bindings
         kb = KeyBindings()
@@ -1020,7 +810,7 @@ class REPL:
                 buffer.insert_text(" ")
             else:
                 # Check for argument placeholder
-                arg_placeholder = get_argument_placeholder_text(cmd_name, subcmd_name)
+                arg_placeholder = layout_builder.get_argument_placeholder_text(cmd_name, subcmd_name)
                 if arg_placeholder:
                     buffer.insert_text(" " + arg_placeholder)
                     # Position cursor at start of placeholder (on the <)
@@ -1050,7 +840,7 @@ class REPL:
                         buffer.insert_text(" ")
                     else:
                         # Regular command - check for args
-                        arg_placeholder = get_argument_placeholder_text(cmd_name)
+                        arg_placeholder = layout_builder.get_argument_placeholder_text(cmd_name)
                         if arg_placeholder:
                             buffer.insert_text(" " + arg_placeholder)
                             cursor_pos = buffer.cursor_position - len(arg_placeholder)
@@ -1069,7 +859,7 @@ class REPL:
                 if hasattr(self.cli, "commands") and cmd_name in self.cli.commands:
                     cmd = self.cli.commands[cmd_name]
                     if hasattr(cmd, "commands") and subcmd_name in cmd.commands:
-                        arg_placeholder = get_argument_placeholder_text(cmd_name, subcmd_name)
+                        arg_placeholder = layout_builder.get_argument_placeholder_text(cmd_name, subcmd_name)
                         if arg_placeholder:
                             buffer.insert_text(" " + arg_placeholder)
                             cursor_pos = buffer.cursor_position - len(arg_placeholder)
