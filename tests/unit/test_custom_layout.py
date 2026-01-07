@@ -279,63 +279,63 @@ class TestPhaseC1ScrollBehavior:
 
 
 class TestPhaseD1FormattedToANSI:
-    """Test Phase D.1: formatted_to_ansi() helper function."""
+    """Test Phase D.1: formatted_text_to_ansi_string() helper function."""
 
-    def test_formatted_to_ansi_empty_list(self):
-        """Test formatted_to_ansi with empty list."""
+    def test_formatted_text_to_ansi_string_empty_list(self):
+        """Test formatted_text_to_ansi_string with empty list."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_to_ansi
+        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
-        result = formatted_to_ansi([], config)
+        result = formatted_text_to_ansi_string([], config)
         assert result == ""
 
-    def test_formatted_to_ansi_plain_text(self):
-        """Test formatted_to_ansi with plain text (no style)."""
+    def test_formatted_text_to_ansi_string_plain_text(self):
+        """Test formatted_text_to_ansi_string with plain text (no style)."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_to_ansi
+        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("", "Hello World")]
-        result = formatted_to_ansi(formatted, config)
+        result = formatted_text_to_ansi_string(formatted, config)
         assert result == "Hello World"
 
-    def test_formatted_to_ansi_single_color(self):
-        """Test formatted_to_ansi with single color."""
+    def test_formatted_text_to_ansi_string_single_color(self):
+        """Test formatted_text_to_ansi_string with single color."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_to_ansi
+        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("red", "Error message")]
-        result = formatted_to_ansi(formatted, config)
+        result = formatted_text_to_ansi_string(formatted, config)
         assert result == "\x1b[31mError message\x1b[0m"
 
-    def test_formatted_to_ansi_bold_style(self):
-        """Test formatted_to_ansi with bold style."""
+    def test_formatted_text_to_ansi_string_bold_style(self):
+        """Test formatted_text_to_ansi_string with bold style."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_to_ansi
+        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("bold", "Bold text")]
-        result = formatted_to_ansi(formatted, config)
+        result = formatted_text_to_ansi_string(formatted, config)
         assert result == "\x1b[1mBold text\x1b[0m"
 
-    def test_formatted_to_ansi_combined_style(self):
-        """Test formatted_to_ansi with combined style."""
+    def test_formatted_text_to_ansi_string_combined_style(self):
+        """Test formatted_text_to_ansi_string with combined style."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_to_ansi
+        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("cyan bold", "Cyan bold text")]
-        result = formatted_to_ansi(formatted, config)
+        result = formatted_text_to_ansi_string(formatted, config)
         # Note: config uses cyan_bold with underscore
         assert "\x1b" in result  # Has ANSI codes
         assert "Cyan bold text" in result
 
-    def test_formatted_to_ansi_multiple_fragments(self):
-        """Test formatted_to_ansi with multiple fragments."""
+    def test_formatted_text_to_ansi_string_multiple_fragments(self):
+        """Test formatted_text_to_ansi_string with multiple fragments."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_to_ansi
+        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [
@@ -343,19 +343,19 @@ class TestPhaseD1FormattedToANSI:
             ("red", "Error "),
             ("green", "Success"),
         ]
-        result = formatted_to_ansi(formatted, config)
+        result = formatted_text_to_ansi_string(formatted, config)
         assert "Normal " in result
         assert "\x1b[31mError \x1b[0m" in result
         assert "\x1b[32mSuccess\x1b[0m" in result
 
-    def test_formatted_to_ansi_unknown_style(self):
-        """Test formatted_to_ansi with unknown style (should output plain text)."""
+    def test_formatted_text_to_ansi_string_unknown_style(self):
+        """Test formatted_text_to_ansi_string with unknown style (should output plain text)."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import formatted_to_ansi
+        from cli_repl_kit.core.repl import formatted_text_to_ansi_string
 
         config = Config.get_defaults()
         formatted = [("unknown_style", "Text")]
-        result = formatted_to_ansi(formatted, config)
+        result = formatted_text_to_ansi_string(formatted, config)
         # Unknown style should just output the text without ANSI codes
         assert result == "Text"
 

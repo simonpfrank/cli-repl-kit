@@ -25,7 +25,7 @@ from cli_repl_kit.plugins.base import ValidationResult
 from cli_repl_kit.plugins.validation import ValidationRule
 
 
-def formatted_to_ansi(formatted_text, config):
+def formatted_text_to_ansi_string(formatted_text, config):
     """Convert FormattedText list to ANSI-escaped string.
 
     Args:
@@ -644,7 +644,7 @@ class REPL:
         intro_text_ansi = ""
         for line in intro_text:
             if isinstance(line, list):
-                intro_text_ansi += formatted_to_ansi(line, self.config) + "\n"
+                intro_text_ansi += formatted_text_to_ansi_string(line, self.config) + "\n"
             else:
                 intro_text_ansi += str(line) + "\n"
 
@@ -662,7 +662,7 @@ class REPL:
             """
             if isinstance(line, list):
                 # FormattedText - convert to ANSI string
-                text = formatted_to_ansi(line, self.config)
+                text = formatted_text_to_ansi_string(line, self.config)
             else:
                 text = str(line)
 
