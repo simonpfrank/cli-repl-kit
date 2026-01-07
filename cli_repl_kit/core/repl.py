@@ -22,47 +22,10 @@ from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 from prompt_toolkit.lexers import Lexer
 
 from cli_repl_kit.core.formatting import ANSILexer, formatted_text_to_ansi_string
+from cli_repl_kit.core.output_capture import OutputCapture
 from cli_repl_kit.core.state import REPLState
 from cli_repl_kit.plugins.base import ValidationResult
 from cli_repl_kit.plugins.validation import ValidationRule
-
-
-class OutputCapture(io.StringIO):
-    """Capture stdout/stderr and redirect to output buffer."""
-
-    def __init__(self, stream_type, output_callback, config):
-        """Initialize capture.
-
-        Args:
-            stream_type: "stdout" or "stderr"
-            output_callback: Function to call with captured text (FormattedText)
-            config: Config for styling
-        """
-        super().__init__()
-        self.stream_type = stream_type
-        self.output_callback = output_callback
-        self.config = config
-
-    def write(self, text):
-        """Capture text and send to output.
-
-        Args:
-            text: Text to capture
-        """
-        if not text or text == "\n":
-            return
-
-        # Add to output with appropriate styling
-        if self.stream_type == "stderr":
-            # Use error color from config
-            self.output_callback([(self.config.colors.error, text)])
-        else:
-            # Default (no style) for stdout
-            self.output_callback([("", text)])
-
-    def flush(self):
-        """Flush (no-op for our purposes)."""
-        pass
 
 
 class ConditionalScrollbarMargin(Margin):

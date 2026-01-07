@@ -435,7 +435,7 @@ class TestPhaseD3OutputCapture:
     def test_output_capture_initialization(self):
         """Test OutputCapture initializes correctly."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import OutputCapture
+        from cli_repl_kit.core.output_capture import OutputCapture
 
         config = Config.get_defaults()
         captured = []
@@ -449,7 +449,7 @@ class TestPhaseD3OutputCapture:
     def test_output_capture_stdout_write(self):
         """Test OutputCapture captures stdout writes."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import OutputCapture
+        from cli_repl_kit.core.output_capture import OutputCapture
 
         config = Config.get_defaults()
         captured = []
@@ -466,7 +466,7 @@ class TestPhaseD3OutputCapture:
     def test_output_capture_stderr_write(self):
         """Test OutputCapture captures stderr writes with red styling."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import OutputCapture
+        from cli_repl_kit.core.output_capture import OutputCapture
 
         config = Config.get_defaults()
         captured = []
@@ -483,7 +483,7 @@ class TestPhaseD3OutputCapture:
     def test_output_capture_ignores_empty_writes(self):
         """Test OutputCapture ignores empty or newline-only writes."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import OutputCapture
+        from cli_repl_kit.core.output_capture import OutputCapture
 
         config = Config.get_defaults()
         captured = []
@@ -501,7 +501,7 @@ class TestPhaseD3OutputCapture:
     def test_output_capture_flush(self):
         """Test OutputCapture flush method (no-op)."""
         from cli_repl_kit.core.config import Config
-        from cli_repl_kit.core.repl import OutputCapture
+        from cli_repl_kit.core.output_capture import OutputCapture
 
         config = Config.get_defaults()
 
