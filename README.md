@@ -1,6 +1,6 @@
 # cli-repl-kit
 
-(Still under development and has outstanding defects)
+(Still under development and has outstanding defects, and critical code structure issues, being AI developed. Refactor underway)
 
 A simple, reusable framework for building interactive command-line tools with both REPL and CLI modes.
 
