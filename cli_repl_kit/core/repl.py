@@ -21,6 +21,7 @@ from prompt_toolkit.layout.dimension import Dimension as D
 from prompt_toolkit.layout.margins import Margin, ScrollbarMargin
 from prompt_toolkit.lexers import Lexer
 
+from cli_repl_kit.core.banner_builder import BannerBuilder
 from cli_repl_kit.core.command_executor import CommandExecutor
 from cli_repl_kit.core.formatting import ANSILexer, formatted_text_to_ansi_string
 from cli_repl_kit.core.key_bindings import KeyBindingManager
@@ -203,104 +204,9 @@ class REPL:
         if history_file.parent != Path("."):
             history_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Box width (inner content area)
-        box_width = self.config.appearance.box_width
-
-        # Get banner text from config (allows customization)
-        banner_text = self.config.appearance.ascii_art_text
-
-        # ASCII art mappings for common text values
-        # This allows nice ASCII art for known values, plain text for others
-        ascii_art_map = {
-            "Hello World": [
-                "  _   _      _ _        __        __         _     _ ",
-                " | | | | ___| | | ___   \\ \\      / /__  _ __| | __| |",
-                " | |_| |/ _ \\ | |/ _ \\   \\ \\ /\\ / / _ \\| '__| |/ _` |",
-                " |  _  |  __/ | | (_) |   \\ V  V / (_) | |  | | (_| |",
-                " |_| |_|\\___|_|_|\\___/     \\_/\\_/ \\___/|_|  |_|\\__,_|",
-            ],
-            "CLI REPL Kit": [
-                "   ____ _     ___   ____  _____ ____  _       _  ___ _   ",
-                "  / ___| |   |_ _| |  _ \\| ____|  _ \\| |     | |/ (_) |_ ",
-                " | |   | |    | |  | |_) |  _| | |_) | |     | ' /| | __|",
-                " | |___| |___ | |  |  _ <| |___|  __/| |___  | . \\| | |_ ",
-                "  \\____|_____|___| |_| \\_\\_____|_|   |_____| |_|\\_\\_|\\__|",
-            ],
-        }
-
-        # Use ASCII art if available, otherwise just use the text centered
-        if banner_text in ascii_art_map:
-            ascii_art = ascii_art_map[banner_text]
-        else:
-            # Plain text fallback - center the text
-            ascii_art = [banner_text]
-
-        # Create intro banner
-        intro_lines = [
-            [("cyan", "╭" + "─" * box_width + "╮")],
-            [("cyan", "│" + " " * box_width + "│")],
-        ]
-
-        # Add ASCII art lines
-        for art_line in ascii_art:
-            padding = box_width - len(art_line) - 2
-            intro_lines.append(
-                [
-                    ("cyan", "│  "),
-                    ("cyan bold", art_line),
-                    ("", " " * padding),
-                    ("cyan", "│"),
-                ]
-            )
-
-        intro_lines.extend(
-            [
-                [("cyan", "│" + " " * box_width + "│")],
-                [
-                    ("cyan", "│"),
-                    ("bold", f"    {self.app_name}"),
-                    ("yellow", " v0.1.0"),
-                    ("", " " * (box_width - len(self.app_name) - 11)),
-                    ("cyan", "│"),
-                ],
-                [
-                    ("cyan", "│"),
-                    ("", "    Type "),
-                    ("green", "/quit"),
-                    ("", " to exit or "),
-                    ("green", "/hello <text>"),
-                    ("", " to greet"),
-                    ("", " " * (box_width - 48)),
-                    ("cyan", "│"),
-                ],
-                [
-                    ("cyan", "│"),
-                    ("", "    Press "),
-                    ("yellow", "Ctrl+J"),
-                    ("", " for multi-line input, "),
-                    ("yellow", "Enter"),
-                    ("", " to submit"),
-                    ("", " " * (box_width - 54)),
-                    ("cyan", "│"),
-                ],
-                [("cyan", "│" + " " * box_width + "│")],
-                [("cyan", "╰" + "─" * box_width + "╯")],
-                [("", "")],
-                [
-                    ("green bold", "Ready!"),
-                    ("", " (/ for commands). Use "),
-                    ("yellow", "↑↓"),
-                    ("", " arrows to navigate menu, "),
-                    ("yellow", "Tab"),
-                    ("", " or "),
-                    ("yellow", "Enter"),
-                    ("", " to select"),
-                ],
-                [("", "")],
-            ]
-        )
-
-        intro_text = intro_lines
+        # Build intro banner
+        banner_builder = BannerBuilder(self.config, self.app_name)
+        intro_text = banner_builder.build()
 
         # State - typed state object (replaces mutable dict)
         state = REPLState()
